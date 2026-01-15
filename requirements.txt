@@ -1,0 +1,8 @@
+# pytorch (see https://pytorch.org/get-started/locally/)
+pandas
+seaborn
+scipy
+statsmodels
+scikit-learn
+datasets
+tiktoken
