@@ -185,3 +185,4 @@ cython_debug/
 *.dtmp
 /data/raw/Movie-O-Label
 /data/raw/oscar_data
+/data/processed
