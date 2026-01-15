@@ -183,3 +183,5 @@ cython_debug/
 .DS_Store
 *.bkp
 *.dtmp
+/data/raw/Movie-O-Label
+/data/raw/oscar_data
