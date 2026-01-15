@@ -8,3 +8,5 @@ datasets
 tiktoken
 matplotlib
 ipykernel
+tqdm
+ipywidgets
