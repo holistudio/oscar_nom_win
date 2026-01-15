@@ -1,5 +1,11 @@
 # Development Log
 
+## 2026-01-15
+
+Just took a few minutes to clean up and organize the data processing and exploratory data analysis notebooks and datasets.
+
+Time to start coding a transformer, in my mind the "chunky transformer encoder-decoder" which has to take the movie script window chunk by window chunk first before predicting probability of Oscar nomination.
+
 ## 2026-01-14
 
 Hello world!
@@ -37,7 +43,7 @@ The other "pie-in-the-sky" goals are beyond my current coding/ML knowledge since
 
 ### TODOs for later
 
-- [ ] Re-organize notebook files and datasets 
+- [x] Re-organize notebook files and datasets 
 - [ ] Exploratory data analysis of word frequencies in movie screenplays.
 
 ### Regarding AI-assisted workflows
