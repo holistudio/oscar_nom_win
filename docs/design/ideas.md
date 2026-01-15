@@ -63,12 +63,14 @@ test: 5.00% won Oscar for best screenplay
 
 ## Neural network architectures and approaches
 
+In general, the models can technically try to predict both nomination and win in one-shot, though careful consideration  nomination=0, win=1 is not a possible result.
+
 ### Natural Language
 
 #### Word counts
 1. Identify the top 50 most frequently used words for each movie script (excluding articles and other "non-content" words)
 2. Do this for each script in the training set and aggregate the words in a dictionary
-3. Visualize distribution of these words for movies that did and didn't get nominated.
+3. Visualize distribution of these words for movies that did and didn't get nominated. Do the same for wins vs nominations.
 4. Find some heuristic that seems to work well enough in the training set.
 5. See how good that is in the validation and test dataset.
 
