@@ -17,9 +17,10 @@ For today I'm just going to make sure the "basic puzzle pieces" are all here:
 - [ ] Get Chunky versions of transformer and GPT-2 to work. 
 - [ ] Make sure these are done in separate branches
 - [ ] Write a simple "unit test" script: load a random movie script in the training set and give it to a model. It should at least spit out a probability with no issues.
+- [ ] Exploratory data analysis of word frequencies in movie screenplays.
+- [ ] Consider ways to deal with the class imbalance during training.
 - [ ] Training-validation-test loops
 - [ ] Use Raytune for tuning hyperparameters.
-- [ ] Exploratory data analysis of word frequencies in movie screenplays.
 
 ## 2026-01-14
 
