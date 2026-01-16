@@ -186,3 +186,4 @@ cython_debug/
 /data/raw/Movie-O-Label
 /data/raw/oscar_data
 /data/processed
+/src/gpt2
