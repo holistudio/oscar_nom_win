@@ -6,6 +6,22 @@ Just took a few minutes to clean up and organize the data processing and explora
 
 Time to start coding a transformer, in my mind the "chunky transformer encoder-decoder" which has to take the movie script window chunk by window chunk first before predicting probability of Oscar nomination.
 
+...and now I'm realizing that I need to take some more time to refresh my memory on the specific pieces of the transformer and GPT-2 so that I can build up towards something that can handle a movie script chunk by chunk. 
+
+For today I'm just going to make sure the "basic puzzle pieces" are all here:
+- a basic Transformer with separate encoder and decoders
+- a GPT-2 model with pre-trained weights (courtesy of Sebastian Raschka's LLMs from Scratch book)
+
+### TODOs for later
+
+- [ ] Get Chunky versions of transformer and GPT-2 to work. 
+- [ ] Make sure these are done in separate branches
+- [ ] Write a simple "unit test" script: load a random movie script in the training set and give it to a model. It should at least spit out a probability with no issues.
+- [ ] Exploratory data analysis of word frequencies in movie screenplays.
+- [ ] Consider ways to deal with the class imbalance during training.
+- [ ] Training-validation-test loops
+- [ ] Use Raytune for tuning hyperparameters.
+
 ## 2026-01-14
 
 Hello world!
