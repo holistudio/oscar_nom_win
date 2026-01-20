@@ -1,5 +1,21 @@
 # Development Log
 
+## 2026-01-20
+
+Finally had some time to circle back to this and refresh my memory on how a transformer's encoder and decoder works. As I was re-writing a boilerplate version a couple things stood out to me that seem to be tricky to change if I want the transformer to process chunks of a movie script into a sequence of embeddings and then decode it into two logits for binary classification.
+
+- Encoder and Decoder will need different `d_model` parameters
+   - They can also have different `nhead` and `dim_ff` parameters
+   - With different `d_model` parameters, Encoder and Decoder will have different positional encoders
+- The same `token_emb`/`nn.Embedding` is typically applied to both `src` and `tgt`.
+   - instead the `tgt_emb` embedding going into the Decoder could just be a linear layer that processes the embedding sequence?
+- The big question in my mind is how the `memory` that usually gets passed from Encoder to Decoder will happen, since what I think I want is the Encoder to pass an embedding sequence.
+   - The other question is what is the `tgt` in this problem anyway? In machine translation, `tgt` starts out as the target language start token and slowly grows as the Transformer translates from source language to target language. But in this binary classification problem, we're not really doing something like that. So shouldn't target just be something arbitrary/blank/random noise?
+
+Just wanted to get these specific questions clarified before I go back to asking Claude what to do next haha.
+
+Next step is just to give Claude this boiler plate and my rough diagram of what I want the transformer architecture to end up looking like and have Claude walk through step by step what changes have to be made. (Note: not via Claude Code, I'm looking for a customized tutorial from Claude, not a one-shot vibecoded solution...not yet at least)
+
 ## 2026-01-15
 
 Just took a few minutes to clean up and organize the data processing and exploratory data analysis notebooks and datasets.
@@ -16,7 +32,7 @@ For today I'm just going to make sure the "basic puzzle pieces" are all here:
 
 - [ ] Get Chunky versions of transformer and GPT-2 to work. 
 - [ ] Make sure these are done in separate branches
-- [ ] Write a simple "unit test" script: load a random movie script in the training set and give it to a model. It should at least spit out a probability with no issues.
+- [x] Write a simple "unit test" script: load a random movie script in the training set and give it to a model. It should at least spit out a probability with no issues.
 - [ ] Exploratory data analysis of word frequencies in movie screenplays.
 - [ ] Consider ways to deal with the class imbalance during training.
 - [ ] Training-validation-test loops
