@@ -79,16 +79,16 @@ def main():
     dataloader = DataLoader(
         dataset,
         batch_size=1,
-        shuffle=False,
+        shuffle=True,
         num_workers=0
     )
 
-    # Load first sample as PyTorch tensor
-    print("\nLoading first sample from DataLoader...")
+    # Load random sample from DataLoader
+    print("\nLoading random sample from DataLoader...")
     first_batch = next(iter(dataloader))
     src = first_batch['input_ids'].to(device)  # [batch_size, seq_len]
     target = first_batch['target'].to(device)  # [batch_size]
-
+    
     print(f"\nFirst sample:")
     print(f"  Input shape: {src.shape}")
     print(f"  Input (first 10 tokens): {src[0, :10]}")
