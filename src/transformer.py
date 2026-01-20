@@ -83,6 +83,8 @@ class OscarNomTransformer(nn.Module):
 
         logits = self.classification_head(decoder_out)
 
+        logits = logits[:, -1, :]
+
         return logits
     
 
