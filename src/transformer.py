@@ -3,14 +3,6 @@ import math
 import torch
 import torch.nn as nn
 
-config = {}
-
-# TODO: positional encoder and think carefully where it is placed.
-class PositionalEncoder(nn.Module):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        pass
-
 class OscarNomTransformer(nn.Module):
     def __init__(self, config, *args, **kwargs):
         super().__init__(*args, **kwargs)
