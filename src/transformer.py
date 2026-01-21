@@ -18,7 +18,6 @@ class OscarNomTransformer(nn.Module):
         self.chunk_size = config['chunk_size']
 
         self.token_emb = nn.Embedding(config['vocab_size'], config['enc_d_model'])
-        self.tgt_emb = nn.Embedding(config['vocab_size'], config['dec_d_model'])
         
         self.enc_pos_enc = self._positional_encoder(config['max_seq_len'], config['enc_d_model'])
         self.dec_pos_enc = self._positional_encoder(config['max_seq_len'], config['dec_d_model'])
@@ -56,22 +55,16 @@ class OscarNomTransformer(nn.Module):
         pe[:, 1::2] = torch.cos(position * div_term)
         return pe.unsqueeze(0)
     
-    def forward(self, src, tgt):
+    def forward(self, src):
         src_seq_len = src.shape[1]
-        tgt_seq_len = tgt.shape[1]
-
 
         src_emb = self.token_emb(src) * math.sqrt(self.enc_d_model)
         src_emb += self.enc_pos_enc[:, :src_seq_len, :].to(src_emb.device)
         src_emb = self.dropout(src_emb)
 
-        tgt_emb = self.tgt_emb(tgt) * math.sqrt(self.dec_d_model)
-        tgt_emb += self.dec_pos_enc[:, :tgt_seq_len, :].to(tgt_emb.device)
-        tgt_emb = self.dropout(tgt_emb)
-
         memory = self.encoder(src_emb)
 
-        decoder_out = self.decoder(tgt_emb, memory)
+        decoder_out = self.decoder(memory)
 
         logits = self.classification_head(decoder_out)
 
