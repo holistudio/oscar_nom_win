@@ -19,8 +19,8 @@ class OscarNomTransformer(nn.Module):
 
         self.token_emb = nn.Embedding(config['vocab_size'], config['enc_d_model'])
         
-        self.enc_pos_enc = self._positional_encoder(config['max_seq_len'], config['enc_d_model'])
-        self.agg_pos_enc = self._positional_encoder(config['max_seq_len'], config['agg_d_model'])
+        self.enc_pos_enc = self._positional_encoder(config['chunk_size'], config['enc_d_model'])
+        self.agg_pos_enc = self._positional_encoder(config['max_seq_len'] // config['chunk_size'] + 1, config['agg_d_model'])
         
         # encoder
         encoder_layer = nn.TransformerEncoderLayer(
