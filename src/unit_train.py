@@ -59,7 +59,7 @@ class OscarScriptDataset(Dataset):
 def main():
     # Load training data
     print("Loading data from data/processed/train_clean.parquet...")
-    df = pd.read_parquet('data/processed/train_clean.parquet')
+    df = pd.read_parquet('../data/processed/train_clean.parquet')
     print(f"Loaded {len(df)} samples")
     print(f"Columns: {df.columns.tolist()}")
 
