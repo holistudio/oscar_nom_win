@@ -78,7 +78,7 @@ def main():
     print("\nCreating DataLoader...")
     dataloader = DataLoader(
         dataset,
-        batch_size=1,
+        batch_size=2,
         shuffle=True,
         num_workers=0
     )
@@ -104,13 +104,13 @@ def main():
         'enc_nhead': 8,
         'enc_dim_ff': 1024,
         'enc_num_layers': 4,
+        
+        'agg_d_model': 256,
+        'agg_nhead': 8,
+        'agg_dim_ff': 1024,
+        'agg_num_layers': 4,
 
-        'dec_d_model': 256,
-        'dec_nhead': 8,
-        'dec_dim_ff': 1024,
-        'dec_num_layers': 4,
-
-        'max_seq_len': 5000,
+        'max_seq_len': 106578,
 
         'dropout': 0.1
     }
