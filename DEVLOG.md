@@ -1,5 +1,20 @@
 # Development Log
 
+## 2026-01-21
+
+Good news is the transformer code is now updated and works for a random sequence of 100k token integers.
+
+Bad / OK news is that the batch size has to be set to 2, otherwise my laptop GPU runs out of memory.
+
+Claude recommends two ways to deal with this:
+
+**Option A:** Process chunks in a loop with gradient checkpointing. Each chunk is encoded sequentially, gradients are reconstructed during backward pass. Slower but memory-efficient.
+
+**Option B:** Freeze the chunk encoder. Use a pretrained encoder (like the first 6 layers of BERT), run it in `torch.no_grad()`, only train the aggregator. Much faster, much less memory, and honestly might work just as well for your task.
+
+Coincidentally Option B is sorta where I was headed already, but I wanted to use the pretrained GPT-2 and keep it frozen.
+
+Of course in my mind, there is an Option C: Keep going! Keep the batch size to 2, there are only 1000 or so training samples and 400 or so validation samples.
 ## 2026-01-20
 
 Finally had some time to circle back to this and refresh my memory on how a transformer's encoder and decoder works. As I was re-writing a boilerplate version a couple things stood out to me that seem to be tricky to change if I want the transformer to process chunks of a movie script into a sequence of embeddings and then decode it into two logits for binary classification.
