@@ -140,7 +140,7 @@ if __name__ == '__main__':
     model = OscarNomTransformer(config).to(device)
 
     batch_size = 2
-    src_seq_len = 100_000
+    src_seq_len = 106578
 
     src = torch.randint(0, config['vocab_size'], (batch_size, src_seq_len)).to(device)
 
