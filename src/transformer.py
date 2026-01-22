@@ -32,6 +32,11 @@ class OscarNomTransformer(nn.Module):
         )
         self.encoder = nn.TransformerEncoder(encoder_layer, num_layers=config['enc_num_layers'])
 
+        if config['enc_d_model'] != config['agg_d_model']:
+            self.chunk_proj = nn.Linear(config['enc_d_model'], config['agg_d_model'])
+        else:
+            self.chunk_proj = nn.Identity()
+            
         # aggregator
         aggregator_layer = nn.TransformerEncoderLayer(
             d_model=config['agg_d_model'],
