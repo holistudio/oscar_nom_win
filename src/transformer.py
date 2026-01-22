@@ -79,8 +79,10 @@ class OscarNomTransformer(nn.Module):
         src = src.view((batch_size * num_chunks, self.chunk_size))
 
         # 2. Embed tokens, add positional encoding
-
         # Shape: (batch_size * num_chunks, chunk_size, enc_d_model)
+        src_emb = self.token_emb(src) * math.sqrt(self.enc_d_model)
+        src_emb += self.enc_pos_enc[:, :self.chunk_size].to(src_emb.device)
+        src_emb = self.dropout(src_emb)
         
         # 3. Encode all chunks (can process in parallel or loop)
         # Shape after encoder: (batch_size * num_chunks, chunk_size, enc_d_model)
