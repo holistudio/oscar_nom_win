@@ -115,23 +115,6 @@ class OscarNomTransformer(nn.Module):
         
         return logits
     
-    def forward(self, src):
-        src_seq_len = src.shape[1]
-
-        src_emb = self.token_emb(src) * math.sqrt(self.enc_d_model)
-        src_emb += self.enc_pos_enc[:, :src_seq_len, :].to(src_emb.device)
-        src_emb = self.dropout(src_emb)
-
-        memory = self.encoder(src_emb)
-
-        decoder_out = self.decoder(memory)
-
-        logits = self.classification_head(decoder_out)
-
-        logits = logits[:, -1, :]
-
-        return logits
-    
 
 if __name__ == '__main__':
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
