@@ -86,11 +86,14 @@ class OscarNomTransformer(nn.Module):
         
         # 3. Encode all chunks (can process in parallel or loop)
         # Shape after encoder: (batch_size * num_chunks, chunk_size, enc_d_model)
+        enc_chunks = self.encoder(src_emb)
         
         # 4. Pool each chunk to single vector (mean pool over token dimension)
         # Shape: (batch_size * num_chunks, enc_d_model)
-        
+        chunk_embs = enc_chunks.mean(dim=1)
+
         # 5. Reshape back to (batch_size, num_chunks, enc_d_model)
+        chunk_embs = chunk_embs.view((batch_size, num_chunks, self.enc_d_model))
         
         # 6. Project if needed, add chunk positional encoding
         # Shape: (batch_size, num_chunks, dec_d_model)
