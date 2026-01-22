@@ -132,23 +132,22 @@ if __name__ == '__main__':
         'agg_dim_ff': 1024,
         'agg_num_layers': 4,
 
-        'max_seq_len': 5000,
+        'max_seq_len': 106578,
 
         'dropout': 0.1
     }
 
     model = OscarNomTransformer(config).to(device)
 
-    batch_size = 4
-    src_seq_len = 512
-    tgt_seq_len = 128
+    batch_size = 2
+    src_seq_len = 100_000
 
     src = torch.randint(0, config['vocab_size'], (batch_size, src_seq_len)).to(device)
-    tgt = torch.randint(0, config['vocab_size'], (batch_size, tgt_seq_len)).to(device)
 
-    logits = model(src, tgt)
-
-    print(f"Source shape: {src.shape}")
-    print(f"Target shape: {tgt.shape}")
-    print(f"Output logits shape: {logits.shape}")
     print(f"Model parameters: {sum(p.numel() for p in model.parameters()):,}")
+    print(f"Source shape: {src.shape}")
+    print("Running forward pass...")
+    logits = model(src)
+
+    print(f"Output logits shape: {logits.shape}")
+    print(f"Logits:\n{logits}")
