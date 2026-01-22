@@ -2,6 +2,7 @@ import math
 
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 
 class OscarNomTransformer(nn.Module):
     def __init__(self, config, *args, **kwargs):
@@ -60,6 +61,48 @@ class OscarNomTransformer(nn.Module):
         pe[:, 1::2] = torch.cos(position * div_term)
         return pe.unsqueeze(0)
     
+    def forward(self, src):
+        batch_size, seq_len = src.shape
+        
+        # 1. Chunk the input
+        # Pad seq_len to be divisible by chunk_size
+        remainder = seq_len % self.chunk_size
+        if remainder != 0:
+            pad_len = self.chunk_size - remainder
+            src = F.pad(src, (0, pad_len), value = 0) # don't pad on left, pad on right with pad_len zeros
+            seq_len = src.shape[1] # now reference updated/padded sequence length
+
+        num_chunks = seq_len // self.chunk_size
+
+        # Then reshape to (batch_size * num_chunks, chunk_size)
+        src = src.view((batch_size, num_chunks, self.chunk_size))
+        src = src.view((batch_size * num_chunks, self.chunk_size))
+
+        # 2. Embed tokens, add positional encoding
+
+        # Shape: (batch_size * num_chunks, chunk_size, enc_d_model)
+        
+        # 3. Encode all chunks (can process in parallel or loop)
+        # Shape after encoder: (batch_size * num_chunks, chunk_size, enc_d_model)
+        
+        # 4. Pool each chunk to single vector (mean pool over token dimension)
+        # Shape: (batch_size * num_chunks, enc_d_model)
+        
+        # 5. Reshape back to (batch_size, num_chunks, enc_d_model)
+        
+        # 6. Project if needed, add chunk positional encoding
+        # Shape: (batch_size, num_chunks, dec_d_model)
+        
+        # 7. Run through aggregator
+        # Shape: (batch_size, num_chunks, dec_d_model)
+        
+        # 8. Pool to single vector (mean pool over chunk dimension)
+        # Shape: (batch_size, dec_d_model)
+        
+        # 9. Classification head
+        # Shape: (batch_size, 2)
+        
+        return logits
     def forward(self, src):
         src_seq_len = src.shape[1]
 
