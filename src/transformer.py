@@ -11,16 +11,16 @@ class OscarNomTransformer(nn.Module):
         self.enc_nhead = config['enc_nhead']
         self.enc_dim_ff = config['enc_dim_ff']
         
-        self.dec_d_model = config['dec_d_model']
-        self.dec_nhead = config['dec_nhead']
-        self.dec_dim_ff = config['dec_dim_ff']
+        self.agg_d_model = config['agg_d_model']
+        self.agg_nhead = config['agg_nhead']
+        self.agg_dim_ff = config['agg_dim_ff']
         
         self.chunk_size = config['chunk_size']
 
         self.token_emb = nn.Embedding(config['vocab_size'], config['enc_d_model'])
         
         self.enc_pos_enc = self._positional_encoder(config['max_seq_len'], config['enc_d_model'])
-        self.dec_pos_enc = self._positional_encoder(config['max_seq_len'], config['dec_d_model'])
+        self.agg_pos_enc = self._positional_encoder(config['max_seq_len'], config['agg_d_model'])
         
         # encoder
         encoder_layer = nn.TransformerEncoderLayer(
@@ -32,19 +32,19 @@ class OscarNomTransformer(nn.Module):
         )
         self.encoder = nn.TransformerEncoder(encoder_layer, num_layers=config['enc_num_layers'])
 
-        # decoder
-        decoder_layer = nn.TransformerDecoderLayer(
-            d_model=config['dec_d_model'],
-            nhead=config['dec_nhead'],
-            dim_feedforward=config['dec_dim_ff'],
+        # aggregator
+        aggregator_layer = nn.TransformerEncoderLayer(
+            d_model=config['agg_d_model'],
+            nhead=config['agg_nhead'],
+            dim_feedforward=config['agg_dim_ff'],
             dropout=config['dropout'],
             batch_first=True
         )
-        self.decoder = nn.TransformerDecoder(decoder_layer, num_layers=config['dec_num_layers'])
+        self.aggregator = nn.TransformerEncoder(aggregator_layer, num_layers=config['agg_num_layers'])
 
         self.dropout= nn.Dropout(config['dropout'])
 
-        self.classification_head = nn.Linear(config['dec_d_model'], 2)
+        self.classification_head = nn.Linear(config['agg_d_model'], 2)
         pass
 
     def _positional_encoder(self, max_seq_len, d_model):
@@ -84,10 +84,10 @@ if __name__ == '__main__':
         'enc_dim_ff': 1024,
         'enc_num_layers': 4,
         
-        'dec_d_model': 256,
-        'dec_nhead': 8,
-        'dec_dim_ff': 1024,
-        'dec_num_layers': 4,
+        'agg_d_model': 256,
+        'agg_nhead': 8,
+        'agg_dim_ff': 1024,
+        'agg_num_layers': 4,
 
         'max_seq_len': 5000,
 
