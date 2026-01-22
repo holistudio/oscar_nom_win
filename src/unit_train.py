@@ -39,7 +39,7 @@ class OscarScriptDataset(Dataset):
 
             # Store tokenized input and target
             self.inputs.append(torch.tensor(tokens, dtype=torch.long))
-            self.targets.append(int(row['nominated']))  # 0 or 1
+            self.targets.append(torch.tensor(int(row['nominated']), dtype=torch.long)) # 0 or 1
 
             if (idx + 1) % 100 == 0:
                 print(f"  Processed {idx + 1}/{len(df)} scripts")
@@ -52,7 +52,7 @@ class OscarScriptDataset(Dataset):
     def __getitem__(self, idx):
         return {
             'input_ids': self.inputs[idx],
-            'target': torch.tensor(self.targets[idx], dtype=torch.long)
+            'target': self.targets[idx]
         }
 
 
@@ -78,7 +78,7 @@ def main():
     print("\nCreating DataLoader...")
     dataloader = DataLoader(
         dataset,
-        batch_size=2,
+        batch_size=1,
         shuffle=True,
         num_workers=0
     )
