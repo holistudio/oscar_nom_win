@@ -15,6 +15,9 @@ Claude recommends two ways to deal with this:
 Coincidentally Option B is sorta where I was headed already, but I wanted to use the pretrained GPT-2 and keep it frozen.
 
 Of course in my mind, there is an Option C: Keep going! Keep the batch size to 2, there are only 1000 or so training samples and 400 or so validation samples.
+
+My `unit_train.py` also works so I'm confident I can take a real movie script from the training script and give it to the `OscarNomTransformer` model in a training loop. Time to start training this thing!
+
 ## 2026-01-20
 
 Finally had some time to circle back to this and refresh my memory on how a transformer's encoder and decoder works. As I was re-writing a boilerplate version a couple things stood out to me that seem to be tricky to change if I want the transformer to process chunks of a movie script into a sequence of embeddings and then decode it into two logits for binary classification.
