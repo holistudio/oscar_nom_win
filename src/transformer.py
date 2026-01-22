@@ -94,15 +94,16 @@ class OscarNomTransformer(nn.Module):
 
         # 5. Reshape back to (batch_size, num_chunks, enc_d_model)
         chunk_embs = chunk_embs.view((batch_size, num_chunks, self.enc_d_model))
-        
+
         # 6. Project if needed, add chunk positional encoding
-        # Shape: (batch_size, num_chunks, dec_d_model)
+        # Shape: (batch_size, num_chunks, agg_d_model)
+        chunk_embs = self.chunk_proj(chunk_embs)
         
         # 7. Run through aggregator
-        # Shape: (batch_size, num_chunks, dec_d_model)
+        # Shape: (batch_size, num_chunks, agg_d_model)
         
         # 8. Pool to single vector (mean pool over chunk dimension)
-        # Shape: (batch_size, dec_d_model)
+        # Shape: (batch_size, agg_d_model)
         
         # 9. Classification head
         # Shape: (batch_size, 2)
