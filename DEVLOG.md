@@ -1,5 +1,19 @@
 # Development Log
 
+## 2026-01-22
+
+Alrighty, training loop now done. Claude suggested I add the following beyond the typical GPT training stuff I've learned:
+- Add cosine annealing learning rate schedule, with a warm-up period of 10% of total steps.
+- Gradient clipping to 1.0 to prevent exploding gradients
+
+Assuming batch size of 2 for both training and validation, a single epoch takes around 2 mins, so 100 epochs will take around 3-4 hours. Not bad!
+
+But with the small batch size I'm curious how the test performance will actually turn out.
+
+Also I still have yet to think about and deal with the class imbalance.
+
+To be continued...
+
 ## 2026-01-21
 
 Good news is the transformer code is now updated and works for a random sequence of 100k token integers.
@@ -14,7 +28,7 @@ Claude recommends two ways to deal with this:
 
 Coincidentally Option B is sorta where I was headed already, but I wanted to use the pretrained GPT-2 and keep it frozen.
 
-Of course in my mind, there is an Option C: Keep going! Keep the batch size to 2, there are only 1000 or so training samples and 400 or so validation samples.
+Of course in my mind, there is an **Option C**: Keep going! Keep the batch size to 2, there are only 1000 or so training samples and 400 or so validation samples.
 
 My `unit_train.py` also works so I'm confident I can take a real movie script from the training script and give it to the `OscarNomTransformer` model in a training loop. Time to start training this thing!
 
