@@ -16,6 +16,7 @@ The training pipeline includes:
 
 import pickle
 import json
+import time
 from pathlib import Path
 
 import torch
@@ -274,7 +275,13 @@ def main():
     # Main Training Loop
     # ============================================================================
     print(f"\nStarting training for {num_epochs} epochs...")
+
+    # Record start time for training
+    training_start_time = time.time()
+    epoch_times = []
+
     for epoch in range(num_epochs):
+        epoch_start_time = time.time()
         # ========================================================================
         # Training Phase
         # ========================================================================
@@ -335,6 +342,16 @@ def main():
         # ========================================================================
         # Logging and Checkpointing
         # ========================================================================
+        # Calculate timing information
+        epoch_time = time.time() - epoch_start_time
+        epoch_times.append(epoch_time)
+        elapsed_time = time.time() - training_start_time
+        avg_epoch_time = sum(epoch_times) / len(epoch_times)
+
+        # Format timing strings
+        elapsed_str = time.strftime("%H:%M:%S", time.gmtime(elapsed_time))
+        avg_time_str = time.strftime("%H:%M:%S", time.gmtime(avg_epoch_time))
+
         # Store losses for this epoch in history
         history['train_loss'].append(avg_train_loss)
         history['val_loss'].append(avg_val_loss)
@@ -355,9 +372,11 @@ def main():
                 'val_loss': avg_val_loss,
             }, checkpoint_path)
 
-            print(f"Epoch [{epoch+1}/{num_epochs}] - Train Loss: {avg_train_loss:.4f}, Val Loss: {avg_val_loss:.4f} - New best! Model saved.")
+            print(f"Epoch [{epoch+1}/{num_epochs}] - Train Loss: {avg_train_loss:.4f}, Val Loss: {avg_val_loss:.4f} - "
+                  f"Elapsed: {elapsed_str}, Avg/Epoch: {avg_time_str} - New best! Model saved.")
         else:
-            print(f"Epoch [{epoch+1}/{num_epochs}] - Train Loss: {avg_train_loss:.4f}, Val Loss: {avg_val_loss:.4f}")
+            print(f"Epoch [{epoch+1}/{num_epochs}] - Train Loss: {avg_train_loss:.4f}, Val Loss: {avg_val_loss:.4f} - "
+                  f"Elapsed: {elapsed_str}, Avg/Epoch: {avg_time_str}")
 
     # ============================================================================
     # Save Training History
