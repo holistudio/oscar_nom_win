@@ -382,7 +382,7 @@ def main():
         # This implements early stopping: we keep the best model seen so far
         if avg_val_loss < best_val_loss:
             best_val_loss = avg_val_loss
-            checkpoint_path = models_dir / 'transformer_best.pth'
+            checkpoint_path = models_dir / f'transformer_best_ep{epoch+1}.pth'
 
             # Save complete training state for potential resumption
             torch.save({
