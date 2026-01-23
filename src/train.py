@@ -56,6 +56,30 @@ class OscarScriptDataset(Dataset):
 
 
 def main():
+
+    # Model and training configuration
+    config = {
+        'chunk_size': 512,
+        'vocab_size': 50257,
+        'enc_d_model': 128,
+        'enc_nhead': 4,
+        'enc_dim_ff': 512,
+        'enc_num_layers': 2,
+        
+        'agg_d_model': 128,
+        'agg_nhead': 4,
+        'agg_dim_ff': 512,
+        'agg_num_layers': 2,
+
+        'max_seq_len': 106578,
+
+        'dropout': 0.3,
+
+        'batch_size': 2,
+        'peak_lr': 1e-4,
+        'weight_decay': 0.05
+    }
+
     # Load pre-tokenized training data
     print("Loading training data from ./token_data/train_tokenized.pkl...")
     with open('./token_data/train_tokenized.pkl', 'rb') as f:
@@ -74,42 +98,25 @@ def main():
 
     # Create datasets
     print("\nCreating PyTorch datasets...")
-    train_dataset = OscarScriptDataset(train_tokenized_items, max_length=106578)
-    val_dataset = OscarScriptDataset(val_tokenized_items, max_length=106578)
+    train_dataset = OscarScriptDataset(train_tokenized_items, max_length=config['max_seq_len'])
+    val_dataset = OscarScriptDataset(val_tokenized_items, max_length=config['max_seq_len'])
 
     # Create dataloaders
     print("\nCreating DataLoaders...")
     train_dataloader = DataLoader(
         train_dataset,
-        batch_size=2,
+        batch_size=config['batch_size'],
         shuffle=True,
         num_workers=0
     )
     val_dataloader = DataLoader(
         val_dataset,
-        batch_size=2,
+        batch_size=config['batch_size'],
         shuffle=False,
         num_workers=0
     )
 
-    # Model configuration
-    config = {
-        'chunk_size': 512,
-        'vocab_size': 50257,
-        'enc_d_model': 128,
-        'enc_nhead': 4,
-        'enc_dim_ff': 512,
-        'enc_num_layers': 2,
-        
-        'agg_d_model': 128,
-        'agg_nhead': 4,
-        'agg_dim_ff': 512,
-        'agg_num_layers': 2,
 
-        'max_seq_len': 106578,
-
-        'dropout': 0.3
-    }
 
     
 
@@ -120,7 +127,7 @@ def main():
 
     # Setup loss function and optimizer
     criterion = nn.CrossEntropyLoss()
-    optimizer = torch.optim.AdamW(model.parameters(), lr=1e-4, weight_decay=0.05)
+    optimizer = torch.optim.AdamW(model.parameters(), lr=config['peak_lr'], weight_decay=config['weight_decay'])
 
     # Training configuration
     num_epochs = 100
@@ -133,8 +140,8 @@ def main():
     # Create learning rate scheduler with warmup and cosine annealing
     warmup_scheduler = torch.optim.lr_scheduler.LinearLR(
         optimizer,
-        start_factor=1e-6 / 1e-4,  # Start from very small lr
-        end_factor=1.0,  # End at initial lr (1e-4)
+        start_factor=1e-6 / config['peak_lr'],  # Start from very small lr
+        end_factor=1.0,  # End at peak lr
         total_iters=warmup_steps
     )
 
@@ -153,7 +160,7 @@ def main():
     print(f"Total training steps: {total_steps}")
     print(f"Warmup steps: {warmup_steps} (10%)")
     print(f"Cosine annealing steps: {cosine_steps}")
-    print(f"LR schedule: {1e-6:.2e} (warmup start) -> {1e-4:.2e} (warmup end) -> {1e-6:.2e} (final)")
+    print(f"LR schedule: {1e-6:.2e} (warmup start) -> {config['peak_lr']:.2e} (warmup end/peak) -> {1e-6:.2e} (final)")
 
     # Data structure to store losses
     history = {
