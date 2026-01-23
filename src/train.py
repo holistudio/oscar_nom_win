@@ -120,7 +120,7 @@ def main():
 
     # Setup loss function and optimizer
     criterion = nn.CrossEntropyLoss()
-    optimizer = torch.optim.AdamW(model.parameters(), lr=1e-4)
+    optimizer = torch.optim.AdamW(model.parameters(), lr=1e-4, weight_decay=0.05)
 
     # Training configuration
     num_epochs = 100
