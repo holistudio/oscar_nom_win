@@ -187,3 +187,4 @@ cython_debug/
 /data/raw/oscar_data
 /data/processed
 /src/gpt2
+/src/token_data
