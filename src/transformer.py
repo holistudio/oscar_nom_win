@@ -17,6 +17,8 @@ class OscarNomTransformer(nn.Module):
         self.agg_dim_ff = config['agg_dim_ff']
         
         self.chunk_size = config['chunk_size']
+        self.enc_num_layers = config['enc_num_layers']
+        self.agg_num_layers = config['agg_num_layers']
 
         self.token_emb = nn.Embedding(config['vocab_size'], config['enc_d_model'])
         
@@ -51,7 +53,12 @@ class OscarNomTransformer(nn.Module):
         self.dropout= nn.Dropout(config['dropout'])
 
         self.classification_head = nn.Linear(config['agg_d_model'], 2)
-        pass
+
+        # Initialize weights following GPT best practices
+        self.apply(self._init_weights)
+
+        # Apply special scaled initialization for residual projections
+        self._init_residual_projections()
 
     def _positional_encoder(self, max_seq_len, d_model):
         position = torch.arange(max_seq_len).unsqueeze(1)
@@ -60,7 +67,45 @@ class OscarNomTransformer(nn.Module):
         pe[:, 0::2] = torch.sin(position * div_term)
         pe[:, 1::2] = torch.cos(position * div_term)
         return pe.unsqueeze(0)
-    
+
+    def _init_weights(self, module):
+        """
+        Initialize weights following GPT best practices.
+        - Embeddings: N(0, 0.02)
+        - Linear layers: N(0, 0.02) for weights, 0 for biases
+        - LayerNorm: standard initialization (weight=1, bias=0)
+        """
+        if isinstance(module, nn.Linear):
+            torch.nn.init.normal_(module.weight, mean=0.0, std=0.02)
+            if module.bias is not None:
+                torch.nn.init.zeros_(module.bias)
+        elif isinstance(module, nn.Embedding):
+            torch.nn.init.normal_(module.weight, mean=0.0, std=0.02)
+        elif isinstance(module, nn.LayerNorm):
+            torch.nn.init.ones_(module.weight)
+            torch.nn.init.zeros_(module.bias)
+
+    def _init_residual_projections(self):
+        """
+        Apply scaled initialization to residual projection layers.
+        Following GPT-2, scale by 1/sqrt(2*num_layers) for stability in deep networks.
+        """
+        total_layers = self.enc_num_layers + self.agg_num_layers
+
+        # Scale residual projections in encoder layers
+        for layer in self.encoder.layers:
+            # Scale the second linear layer in the feedforward network (residual projection)
+            torch.nn.init.normal_(layer.linear2.weight, mean=0.0, std=0.02/math.sqrt(2 * total_layers))
+            # Scale the output projection in multi-head attention
+            torch.nn.init.normal_(layer.self_attn.out_proj.weight, mean=0.0, std=0.02/math.sqrt(2 * total_layers))
+
+        # Scale residual projections in aggregator layers
+        for layer in self.aggregator.layers:
+            # Scale the second linear layer in the feedforward network (residual projection)
+            torch.nn.init.normal_(layer.linear2.weight, mean=0.0, std=0.02/math.sqrt(2 * total_layers))
+            # Scale the output projection in multi-head attention
+            torch.nn.init.normal_(layer.self_attn.out_proj.weight, mean=0.0, std=0.02/math.sqrt(2 * total_layers))
+
     def forward(self, src):
         batch_size, seq_len = src.shape
         
