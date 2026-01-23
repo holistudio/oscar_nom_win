@@ -113,6 +113,13 @@ def main():
         'val_loss': []
     }
 
+    # Initialize best validation loss for model checkpointing
+    best_val_loss = float('inf')
+
+    # Create models directory
+    models_dir = Path('../models')
+    models_dir.mkdir(exist_ok=True)
+
     # Training loop
     print(f"\nStarting training for {num_epochs} epochs...")
     for epoch in range(num_epochs):
@@ -165,8 +172,20 @@ def main():
         history['train_loss'].append(avg_train_loss)
         history['val_loss'].append(avg_val_loss)
 
-        # Print progress
-        print(f"Epoch [{epoch+1}/{num_epochs}] - Train Loss: {avg_train_loss:.4f}, Val Loss: {avg_val_loss:.4f}")
+        # Save model checkpoint if validation loss improved
+        if avg_val_loss < best_val_loss:
+            best_val_loss = avg_val_loss
+            checkpoint_path = models_dir / f'AnyModelClass_best_epoch{epoch+1}.pth'
+            torch.save({
+                'epoch': epoch + 1,
+                'model_state_dict': model.state_dict(),
+                'optimizer_state_dict': optimizer.state_dict(),
+                'train_loss': avg_train_loss,
+                'val_loss': avg_val_loss,
+            }, checkpoint_path)
+            print(f"Epoch [{epoch+1}/{num_epochs}] - Train Loss: {avg_train_loss:.4f}, Val Loss: {avg_val_loss:.4f} - New best! Model saved.")
+        else:
+            print(f"Epoch [{epoch+1}/{num_epochs}] - Train Loss: {avg_train_loss:.4f}, Val Loss: {avg_val_loss:.4f}")
 
     # Save training history
     print("\nSaving training history...")
