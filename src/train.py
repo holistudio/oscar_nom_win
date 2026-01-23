@@ -125,6 +125,36 @@ def main():
     # Training configuration
     num_epochs = 100
 
+    # Calculate total steps for learning rate scheduling
+    total_steps = num_epochs * len(train_dataloader)
+    warmup_steps = int(0.1 * total_steps)
+    cosine_steps = total_steps - warmup_steps
+
+    # Create learning rate scheduler with warmup and cosine annealing
+    warmup_scheduler = torch.optim.lr_scheduler.LinearLR(
+        optimizer,
+        start_factor=1e-6 / 1e-4,  # Start from very small lr
+        end_factor=1.0,  # End at initial lr (1e-4)
+        total_iters=warmup_steps
+    )
+
+    cosine_scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
+        optimizer,
+        T_max=cosine_steps,
+        eta_min=1e-6
+    )
+
+    scheduler = torch.optim.lr_scheduler.SequentialLR(
+        optimizer,
+        schedulers=[warmup_scheduler, cosine_scheduler],
+        milestones=[warmup_steps]
+    )
+
+    print(f"Total training steps: {total_steps}")
+    print(f"Warmup steps: {warmup_steps} (10%)")
+    print(f"Cosine annealing steps: {cosine_steps}")
+    print(f"LR schedule: {1e-6:.2e} (warmup start) -> {1e-4:.2e} (warmup end) -> {1e-6:.2e} (final)")
+
     # Data structure to store losses
     history = {
         'train_loss': [],
@@ -160,6 +190,7 @@ def main():
             # Backward pass and optimization
             loss.backward()
             optimizer.step()
+            scheduler.step()
 
             train_losses.append(loss.item())
 
@@ -198,6 +229,7 @@ def main():
                 'epoch': epoch + 1,
                 'model_state_dict': model.state_dict(),
                 'optimizer_state_dict': optimizer.state_dict(),
+                'scheduler_state_dict': scheduler.state_dict(),
                 'train_loss': avg_train_loss,
                 'val_loss': avg_val_loss,
             }, checkpoint_path)
