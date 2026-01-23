@@ -6,7 +6,7 @@ Alrighty, training loop now done. Claude suggested I add the following beyond th
 - Add cosine annealing learning rate schedule, with a warm-up period of 10% of total steps.
 - Gradient clipping to 1.0 to prevent exploding gradients
 
-Assuming batch size of 2 for both training and validation, a single epoch takes around 2 mins, so 100 epochs will take around 3-4 hours. Not bad!
+Assuming batch size of 4 for both training and validation (which ends up taking 11/16GB vRAM), a single epoch takes around 2 mins, so 100 epochs will take around 3-4 hours. Not bad!
 
 But with the small batch size I'm curious how the test performance will actually turn out.
 
