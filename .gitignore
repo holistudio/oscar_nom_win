@@ -188,3 +188,4 @@ cython_debug/
 /data/processed
 /src/gpt2
 /src/token_data
+/models
