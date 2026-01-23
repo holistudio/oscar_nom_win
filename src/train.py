@@ -6,7 +6,7 @@ import torch
 import torch.nn as nn
 from torch.utils.data import Dataset, DataLoader
 
-import AnyModelClass
+from transformer import OscarNomTransformer
 
 
 class OscarScriptDataset(Dataset):
@@ -81,28 +81,46 @@ def main():
     print("\nCreating DataLoaders...")
     train_dataloader = DataLoader(
         train_dataset,
-        batch_size=1,
+        batch_size=2,
         shuffle=True,
         num_workers=0
     )
     val_dataloader = DataLoader(
         val_dataset,
-        batch_size=1,
+        batch_size=2,
         shuffle=False,
         num_workers=0
     )
 
     # Model configuration
-    config = {}
+    config = {
+        'chunk_size': 512,
+        'vocab_size': 50257,
+        'enc_d_model': 128,
+        'enc_nhead': 4,
+        'enc_dim_ff': 512,
+        'enc_num_layers': 2,
+        
+        'agg_d_model': 128,
+        'agg_nhead': 4,
+        'agg_dim_ff': 512,
+        'agg_num_layers': 2,
+
+        'max_seq_len': 106578,
+
+        'dropout': 0.3
+    }
+
+    
 
     # Initialize model
-    print("\nInitializing AnyModelClass...")
-    model = AnyModelClass(config).to(device)
+    print("\nInitializing model...")
+    model = OscarNomTransformer(config).to(device)
     print(f"Model parameters: {sum(p.numel() for p in model.parameters()):,}")
 
     # Setup loss function and optimizer
     criterion = nn.CrossEntropyLoss()
-    optimizer = torch.optim.AdamW(model.parameters(), lr=0.001)
+    optimizer = torch.optim.AdamW(model.parameters(), lr=1e-4)
 
     # Training configuration
     num_epochs = 100
