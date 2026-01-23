@@ -1,9 +1,12 @@
 import pickle
+import json
+from pathlib import Path
 
 import torch
+import torch.nn as nn
 from torch.utils.data import Dataset, DataLoader
 
-from transformer import OscarNomTransformer
+import AnyModelClass
 
 
 class OscarScriptDataset(Dataset):
@@ -54,86 +57,128 @@ class OscarScriptDataset(Dataset):
 
 def main():
     # Load pre-tokenized training data
-    print("Loading data from ./token_data/train_tokenized.pkl...")
+    print("Loading training data from ./token_data/train_tokenized.pkl...")
     with open('./token_data/train_tokenized.pkl', 'rb') as f:
-        tokenized_items = pickle.load(f)
-    print(f"Loaded {len(tokenized_items)} samples")
+        train_tokenized_items = pickle.load(f)
+    print(f"Loaded {len(train_tokenized_items)} training samples")
+
+    # Load pre-tokenized validation data
+    print("Loading validation data from ./token_data/val_tokenized.pkl...")
+    with open('./token_data/val_tokenized.pkl', 'rb') as f:
+        val_tokenized_items = pickle.load(f)
+    print(f"Loaded {len(val_tokenized_items)} validation samples")
 
     # Setup device
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
     print(f"Using device: {device}")
 
-    # Create dataset and dataloader
-    print("\nCreating PyTorch dataset...")
-    dataset = OscarScriptDataset(tokenized_items, max_length=106578)
+    # Create datasets
+    print("\nCreating PyTorch datasets...")
+    train_dataset = OscarScriptDataset(train_tokenized_items, max_length=106578)
+    val_dataset = OscarScriptDataset(val_tokenized_items, max_length=106578)
 
-    print("\nCreating DataLoader...")
-    dataloader = DataLoader(
-        dataset,
+    # Create dataloaders
+    print("\nCreating DataLoaders...")
+    train_dataloader = DataLoader(
+        train_dataset,
         batch_size=1,
         shuffle=True,
         num_workers=0
     )
+    val_dataloader = DataLoader(
+        val_dataset,
+        batch_size=1,
+        shuffle=False,
+        num_workers=0
+    )
 
-    # Load random sample from DataLoader
-    print("\nLoading random sample from DataLoader...")
-    first_batch = next(iter(dataloader))
-    src = first_batch['input_ids'].to(device)  # [batch_size, seq_len]
-    target = first_batch['target'].to(device)  # [batch_size]
-    
-    print("\nFirst sample:")
-    print(f"  Input shape: {src.shape}")
-    print(f"  Input (first 10 tokens): {src[0, :10]}")
-    print(f"  Target: {target.item()}")
-    print(f"  Target label: {'Nominated' if target.item() == 1 else 'Not nominated'}")
-
-    
     # Model configuration
-    config = {
-        'chunk_size': 1024,
-        'vocab_size': 50257,
-        'enc_d_model': 256,
-        'enc_nhead': 8,
-        'enc_dim_ff': 1024,
-        'enc_num_layers': 4,
-        
-        'agg_d_model': 256,
-        'agg_nhead': 8,
-        'agg_dim_ff': 1024,
-        'agg_num_layers': 4,
-
-        'max_seq_len': 106578,
-
-        'dropout': 0.1
-    }
+    config = {}
 
     # Initialize model
-    print("\nInitializing OscarNomTransformer...")
-    model = OscarNomTransformer(config).to(device)
-    model.eval()
-
+    print("\nInitializing AnyModelClass...")
+    model = AnyModelClass(config).to(device)
     print(f"Model parameters: {sum(p.numel() for p in model.parameters()):,}")
 
-    # Run inference
-    print("\nRunning forward pass...")
-    with torch.no_grad():
-        logits = model(src)
+    # Setup loss function and optimizer
+    criterion = nn.CrossEntropyLoss()
+    optimizer = torch.optim.AdamW(model.parameters(), lr=0.001)
 
-    # Print results
-    print("\nModel Output:")
-    print(f"  Logits shape: {logits.shape}")
-    print(f"  Logits: {logits}")
-    print(f"  Raw values: {logits[0].cpu().numpy()}")
+    # Training configuration
+    num_epochs = 100
 
-    # Apply softmax to get probabilities
-    probs = torch.softmax(logits, dim=-1)
-    print("\nProbabilities:")
-    print(f"  Class 0 (Not nominated/won): {probs[0, 0].item():.4f}")
-    print(f"  Class 1 (Nominated/won): {probs[0, 1].item():.4f}")
+    # Data structure to store losses
+    history = {
+        'train_loss': [],
+        'val_loss': []
+    }
 
-    # Get prediction
-    prediction = torch.argmax(logits, dim=-1)
-    print(f"\nPrediction: {prediction.item()}")
+    # Training loop
+    print(f"\nStarting training for {num_epochs} epochs...")
+    for epoch in range(num_epochs):
+        # Training phase
+        model.train()
+        train_losses = []
+
+        for batch_idx, batch in enumerate(train_dataloader):
+            # Get batch data
+            input_ids = batch['input_ids'].to(device)
+            targets = batch['target'].to(device)
+
+            # Forward pass
+            optimizer.zero_grad()
+            logits = model(input_ids)
+
+            # Calculate loss
+            loss = criterion(logits, targets)
+
+            # Backward pass and optimization
+            loss.backward()
+            optimizer.step()
+
+            train_losses.append(loss.item())
+
+        # Calculate average training loss for the epoch
+        avg_train_loss = sum(train_losses) / len(train_losses)
+
+        # Validation phase
+        model.eval()
+        val_losses = []
+
+        with torch.no_grad():
+            for batch in val_dataloader:
+                # Get batch data
+                input_ids = batch['input_ids'].to(device)
+                targets = batch['target'].to(device)
+
+                # Forward pass
+                logits = model(input_ids)
+
+                # Calculate loss
+                loss = criterion(logits, targets)
+                val_losses.append(loss.item())
+
+        # Calculate average validation loss for the epoch
+        avg_val_loss = sum(val_losses) / len(val_losses)
+
+        # Store losses in history
+        history['train_loss'].append(avg_train_loss)
+        history['val_loss'].append(avg_val_loss)
+
+        # Print progress
+        print(f"Epoch [{epoch+1}/{num_epochs}] - Train Loss: {avg_train_loss:.4f}, Val Loss: {avg_val_loss:.4f}")
+
+    # Save training history
+    print("\nSaving training history...")
+    output_dir = Path('../results')
+    output_dir.mkdir(exist_ok=True)
+
+    history_file = output_dir / 'training_history.json'
+    with open(history_file, 'w') as f:
+        json.dump(history, f, indent=2)
+
+    print(f"Training history saved to {history_file}")
+    print("\nTraining complete!")
 
 if __name__ == '__main__':
     main()
