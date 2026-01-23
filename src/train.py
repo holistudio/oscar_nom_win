@@ -128,6 +128,13 @@ def main():
     args = parser.parse_args()
 
     # ============================================================================
+    # Reproducibility
+    # ============================================================================
+    # Set random seeds for reproducibility across runs
+    torch.manual_seed(1337)
+    torch.cuda.manual_seed_all(1337)  # For multi-GPU setups
+
+    # ============================================================================
     # Configuration
     # ============================================================================
     # Model and training hyperparameters
