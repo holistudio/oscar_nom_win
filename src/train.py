@@ -17,6 +17,7 @@ The training pipeline includes:
 import pickle
 import json
 import time
+import argparse
 from pathlib import Path
 
 import torch
@@ -111,6 +112,20 @@ def main():
     The training uses a cosine annealing schedule with linear warmup for
     the learning rate, and implements early stopping based on validation loss.
     """
+
+    # ============================================================================
+    # Argument Parsing
+    # ============================================================================
+    parser = argparse.ArgumentParser(
+        description='Train Oscar nomination prediction transformer model'
+    )
+    parser.add_argument(
+        '--epochs',
+        type=int,
+        default=100,
+        help='Number of training epochs (default: 100)'
+    )
+    args = parser.parse_args()
 
     # ============================================================================
     # Configuration
@@ -216,7 +231,7 @@ def main():
     # ============================================================================
     # Training Configuration
     # ============================================================================
-    num_epochs = 100
+    num_epochs = args.epochs
 
     # ============================================================================
     # Learning Rate Scheduler
