@@ -1,6 +1,4 @@
-import pandas as pd
-
-import tiktoken
+import pickle
 
 import torch
 from torch.utils.data import Dataset, DataLoader
@@ -11,24 +9,22 @@ from transformer import OscarNomTransformer
 class OscarScriptDataset(Dataset):
     """Dataset for Oscar nomination prediction from movie scripts."""
 
-    def __init__(self, df, tokenizer, max_length=5000):
+    def __init__(self, tokenized_items, max_length=5000):
         """
         Args:
-            df: DataFrame with 'script_clean' and 'nominated' columns
-            tokenizer: tiktoken tokenizer instance
-            max_length: Maximum sequence length for tokenization
+            tokenized_items: List of dicts with 'input_ids' and 'target' keys
+            max_length: Maximum sequence length for padding/truncation
         """
-        self.tokenizer = tokenizer
         self.max_length = max_length
 
-        # Tokenize all scripts and store targets
-        print(f"Tokenizing {len(df)} scripts...")
+        # Process pre-tokenized inputs
+        print(f"Processing {len(tokenized_items)} pre-tokenized scripts...")
         self.inputs = []
         self.targets = []
 
-        for idx, row in df.iterrows():
-            # Tokenize script text
-            tokens = tokenizer.encode(row['script_clean'])
+        for idx, item in enumerate(tokenized_items):
+            # Get pre-tokenized input_ids
+            tokens = item['input_ids']
 
             # Truncate or pad to max_length
             if len(tokens) > max_length:
@@ -39,12 +35,12 @@ class OscarScriptDataset(Dataset):
 
             # Store tokenized input and target
             self.inputs.append(torch.tensor(tokens, dtype=torch.long))
-            self.targets.append(torch.tensor(int(row['nominated']), dtype=torch.long)) # 0 or 1
+            self.targets.append(torch.tensor(item['target'], dtype=torch.long))  # 0 or 1
 
             if (idx + 1) % 100 == 0:
-                print(f"  Processed {idx + 1}/{len(df)} scripts")
+                print(f"  Processed {idx + 1}/{len(tokenized_items)} scripts")
 
-        print(f"Tokenization complete!")
+        print("Processing complete!")
 
     def __len__(self):
         return len(self.inputs)
@@ -57,15 +53,11 @@ class OscarScriptDataset(Dataset):
 
 
 def main():
-    # Load training data
-    print("Loading data from data/processed/train_clean.parquet...")
-    df = pd.read_parquet('../data/processed/train_clean.parquet')
-    print(f"Loaded {len(df)} samples")
-    print(f"Columns: {df.columns.tolist()}")
-
-    # Initialize tokenizer
-    print("\nInitializing GPT-2 tokenizer (tiktoken)...")
-    tokenizer = tiktoken.get_encoding("gpt2")
+    # Load pre-tokenized training data
+    print("Loading data from ./token_data/train_tokenized.pkl...")
+    with open('./token_data/train_tokenized.pkl', 'rb') as f:
+        tokenized_items = pickle.load(f)
+    print(f"Loaded {len(tokenized_items)} samples")
 
     # Setup device
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
@@ -73,7 +65,7 @@ def main():
 
     # Create dataset and dataloader
     print("\nCreating PyTorch dataset...")
-    dataset = OscarScriptDataset(df, tokenizer, max_length=106578)
+    dataset = OscarScriptDataset(tokenized_items, max_length=106578)
 
     print("\nCreating DataLoader...")
     dataloader = DataLoader(
@@ -89,7 +81,7 @@ def main():
     src = first_batch['input_ids'].to(device)  # [batch_size, seq_len]
     target = first_batch['target'].to(device)  # [batch_size]
     
-    print(f"\nFirst sample:")
+    print("\nFirst sample:")
     print(f"  Input shape: {src.shape}")
     print(f"  Input (first 10 tokens): {src[0, :10]}")
     print(f"  Target: {target.item()}")
@@ -128,14 +120,14 @@ def main():
         logits = model(src)
 
     # Print results
-    print(f"\nModel Output:")
+    print("\nModel Output:")
     print(f"  Logits shape: {logits.shape}")
     print(f"  Logits: {logits}")
     print(f"  Raw values: {logits[0].cpu().numpy()}")
 
     # Apply softmax to get probabilities
     probs = torch.softmax(logits, dim=-1)
-    print(f"\nProbabilities:")
+    print("\nProbabilities:")
     print(f"  Class 0 (Not nominated/won): {probs[0, 0].item():.4f}")
     print(f"  Class 1 (Nominated/won): {probs[0, 1].item():.4f}")
 
