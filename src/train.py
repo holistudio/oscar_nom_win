@@ -162,7 +162,7 @@ def main():
         'dropout': 0.3,                  # Dropout probability for all layers
 
         # Training hyperparameters
-        'batch_size': 2,                 # Number of samples per batch
+        'batch_size': 4,                 # Number of samples per batch
         'peak_lr': 1e-4,                 # Peak learning rate (reached after warmup)
         'weight_decay': 0.05             # L2 regularization coefficient for AdamW
     }
