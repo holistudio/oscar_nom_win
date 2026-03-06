@@ -140,31 +140,31 @@ def main():
     # Model and training hyperparameters
     config = {
         # Chunking parameters
-        'chunk_size': 512,              # Size of each chunk for hierarchical processing
+        'chunk_size': 1024,              # Size of each chunk for hierarchical processing
         'vocab_size': 50257,             # Vocabulary size (GPT-2 tokenizer)
 
         # Encoder transformer (processes individual chunks)
-        'enc_d_model': 128,              # Embedding dimension for encoder
-        'enc_nhead': 4,                  # Number of attention heads in encoder
-        'enc_dim_ff': 512,               # Feedforward dimension in encoder
-        'enc_num_layers': 2,             # Number of encoder transformer layers
+        'enc_d_model': 192,              # Embedding dimension for encoder
+        'enc_nhead': 6,                  # Number of attention heads in encoder
+        'enc_dim_ff': 384,               # Feedforward dimension in encoder
+        'enc_num_layers': 3,             # Number of encoder transformer layers
 
         # Aggregator transformer (combines chunk representations)
         'agg_d_model': 128,              # Embedding dimension for aggregator
         'agg_nhead': 4,                  # Number of attention heads in aggregator
-        'agg_dim_ff': 512,               # Feedforward dimension in aggregator
-        'agg_num_layers': 2,             # Number of aggregator transformer layers
+        'agg_dim_ff': 256,               # Feedforward dimension in aggregator
+        'agg_num_layers': 1,             # Number of aggregator transformer layers
 
         # Sequence parameters
         'max_seq_len': 106578,           # Maximum sequence length (full script)
 
         # Regularization
-        'dropout': 0.3,                  # Dropout probability for all layers
+        'dropout': 0.35,                  # Dropout probability for all layers
 
         # Training hyperparameters
-        'batch_size': 4,                 # Number of samples per batch
-        'peak_lr': 1e-4,                 # Peak learning rate (reached after warmup)
-        'weight_decay': 0.05             # L2 regularization coefficient for AdamW
+        'batch_size': 2,                 # Number of samples per batch
+        'peak_lr': 8e-5,                 # Peak learning rate (reached after warmup)
+        'weight_decay': 0.08             # L2 regularization coefficient for AdamW
     }
 
     # ============================================================================
@@ -225,7 +225,10 @@ def main():
     # Loss Function and Optimizer
     # ============================================================================
     # Use CrossEntropyLoss for binary classification (outputs 2 logits)
-    criterion = nn.CrossEntropyLoss()
+    # Penalize errors in minority class with higher class weights
+    class_weights = torch.tensor([1.0, 4.0]).to(device)
+    # Label smoothing helps with generalization and prevent overconfident predictions
+    criterion = nn.CrossEntropyLoss(weight=class_weights, label_smoothing=0.1)
 
     # AdamW optimizer with decoupled weight decay regularization
     # Initialized with peak_lr (will be modulated by scheduler)
