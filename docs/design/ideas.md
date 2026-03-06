@@ -92,6 +92,20 @@ Transformer Encoder and pre-trained GPT-2
 
 Only look at the first 1024 tokens of each summary, predict Oscar nomination using pre-trained GPT-2 + binary classifier head.
 
+### GPT-2 Fine tuning instructions
+
+Somehow get GPT-2 to just say yes or no for the question "Will this movie get an Oscar?"
+
+The challenge is again the GPT-2 context window of 1024 tokens.
+- Similar to above but this time train it to predict "Yes" or "No" as the next word.
+OR:
+- Or have the same GPT-2 model make multiple "passes" over the script:
+- Each time the GPT-2 tries to summarize the 1024 tokens it can fit into context window into smaller and smaller chunks.
+- The final pass should produce a summary of the movie that fits in the context window.
+- Then the model just gets asked.
+
+This is a clever but also not very interesting approach.
+
 ### Open Source Local LLMs
 
 System message: "Read the following movie script and predict its probability of getting nominated for an Academy Award/Oscar in any category. Respond only with a decimal value ranging between 0 and 1, inclusive."
@@ -101,4 +115,5 @@ User message: an entire script
 Measure its classification performance out-of-the-box.
 
 Figure out a way to fine tune it.
+
 ## Class imbalance methods
