@@ -1,5 +1,16 @@
 # Development Log
 
+## 2026-03-05
+
+Just had some time to come back to this.
+
+After reviewing what I've done and thought about so far, some ideas:
+- It's a bit unclear if the chunky transformer can do better than the hyperparameter and training settings I've tried so far, but worth exploring with some Raytune hyperparamter tuning.
+   - Basically, if the chunky transformer's encoder (part that processes individual chunks of the entire movie scritp) has bigger dimensions, the prediction accuracy and precision improves but at the cost of lower recall and F-1 scores.
+- I believe I still need to try using the pre-trained GPT-2 model weights in the chunky GPT-to-transformer decoder architecture idea. Will need to get this working in a separate branch.
+- I've been meaning to consult Andrej Karpathy's recipe on training neural nets.
+- And w.r.t. class imbalance I had Claude do some deep research and need to review that with the Appendix Section of Sebastian Raschka's *Building LLMs from Scratch* book.
+
 ## 2026-01-22
 
 Alrighty, training loop now done. Claude suggested I add the following beyond the typical GPT training stuff I've learned:
