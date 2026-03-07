@@ -1,9 +1,13 @@
+import os
+import json
 import pickle
+import tensorflow as tf
 
 import torch
 from torch.utils.data import Dataset, DataLoader
 
-from transformer import OscarNomTransformer
+from gpt_download import load_gpt2_params_from_tf_ckpt
+from gpt import OscarNomGPT
 
 
 class OscarScriptDataset(Dataset):
@@ -88,28 +92,43 @@ def main():
     print(f"  Target label: {'Nominated' if target.item() == 1 else 'Not nominated'}")
 
     
-    # Model configuration
-    config = {
-        'chunk_size': 1024,
-        'vocab_size': 50257,
-        'enc_d_model': 256,
-        'enc_nhead': 8,
-        'enc_dim_ff': 1024,
-        'enc_num_layers': 4,
-        
-        'agg_d_model': 256,
-        'agg_nhead': 8,
-        'agg_dim_ff': 1024,
-        'agg_num_layers': 4,
+    torch.manual_seed(1337)
+    device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 
+    model_size="124M"
+    models_dir="gpt2"
+
+    # Define GPT model path
+    model_dir = os.path.join(models_dir, model_size)
+
+    # Load GPT settings and params
+    tf_ckpt_path = tf.train.latest_checkpoint(model_dir)
+
+    settings = json.load(open(os.path.join(model_dir, "hparams.json"), "r", encoding="utf-8"))
+    params = load_gpt2_params_from_tf_ckpt(tf_ckpt_path, settings)
+
+    config = {
+        "vocab_size": 50257,
+        "context_length": 1024,
+        "emb_dim": 768,
+        "n_heads": 12,
+        "n_layers": 12,
+
+        'agg_d_model': 64,
+        'agg_nhead': 2,
+        'agg_dim_ff': 128,
+        'agg_num_layers': 1,
+        
         'max_seq_len': 106578,
 
-        'dropout': 0.1
+        "drop_rate": 0.1,
+        "qkv_bias": True
     }
 
+    
     # Initialize model
-    print("\nInitializing OscarNomTransformer...")
-    model = OscarNomTransformer(config).to(device)
+    print("\nInitializing OscarNomGPT...")
+    model = OscarNomGPT(config, params).to(device)
     model.eval()
 
     print(f"Model parameters: {sum(p.numel() for p in model.parameters()):,}")
