@@ -1,5 +1,28 @@
 # Development Log
 
+## 2026-03-06
+
+Things to consider for `OscarNomGPT` class
+- Loading the GPT pretrained weights for `GPTModel` during `OscarNomGPT`'s initialization
+- `GPTModel.out_head` has an output size = original vocab size, but this should be change to a new variable `output_size` and match up with `agg_d_model` for the TransformerEncoder that processes all the chunks.
+- How that happens in conjunction with loading pre-trained weights is tricky, so refer to Raschka's LLM code.
+- `cfg["emb_dim"]` for GPTModel should be the same as `config['enc_d_model']`
+
+```python
+self.out_head = nn.Linear(
+            cfg["emb_dim"], cfg["enc_d_model"], bias=False
+        )
+```
+- but if they are, the out_head for `GPTModel` is a bit redundant.
+- The positional encoder for the encoder in `OscarNomTransformer` is probably not necessary since `GPTModel` will apply its own position encoding to the input now. 
+- But the `agg_pos_enc` will remain as the sinusoidal positional encoder (this could be worth revisiting later)
+
+Changes needed for `train.py`
+- line 141-168 defines a config specific to the chunky transformer. to adapt this to chunky GPT, the `config` variable should be loaded from a separate JSON file or something
+- line 221 specifically initializes `OscarNomTransformer` class model with the `config`. this will need to flexibly change between chunky transformer and chunky GPT
+- alternatively, just rename `train.py` as `train_transformer.py` and then copy it as a separate version for `train_gpt.py` since the gpt model also needs to load pre-trained weights...(unless this can be done within the importing)
+- same for `unit_train.py`
+
 ## 2026-03-05
 
 Just had some time to come back to this.
