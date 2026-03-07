@@ -162,6 +162,8 @@ class GPTModel(nn.Module):
             for _ in range(cfg["n_layers"])]
         )
         self.final_norm = LayerNorm(cfg["emb_dim"])
+
+        # still needed for easy loading of GPT-2 pretrained weights
         self.out_head = nn.Linear(
             cfg["emb_dim"], cfg["vocab_size"], bias=False
         )
@@ -175,8 +177,10 @@ class GPTModel(nn.Module):
         x = self.drop_emb(x)
         x = self.trf_blocks(x)
         x = self.final_norm(x)
-        logits = self.out_head(x)
-        return logits
+
+        # skipped since another module only needs the emb_dim sized output
+        # logits = self.out_head(x)
+        return x
     
 
 class OscarNomGPT(nn.Module):
