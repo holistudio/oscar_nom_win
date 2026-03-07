@@ -14,6 +14,7 @@ The training pipeline includes:
 - Model checkpointing based on validation loss
 """
 
+import os
 import pickle
 import json
 import time
@@ -22,9 +23,11 @@ from pathlib import Path
 
 import torch
 import torch.nn as nn
-from torch.utils.data import Dataset, DataLoader
+from torch.utils.data import Dataset, DataLoader, RandomSampler
 
-from transformer import OscarNomTransformer
+import tensorflow as tf
+from gpt_download import load_gpt2_params_from_tf_ckpt
+from gpt import OscarNomGPT
 
 
 class OscarScriptDataset(Dataset):
@@ -122,8 +125,8 @@ def main():
     parser.add_argument(
         '--epochs',
         type=int,
-        default=100,
-        help='Number of training epochs (default: 100)'
+        default=3,
+        help='Number of training epochs (default: 3)'
     )
     args = parser.parse_args()
 
@@ -133,6 +136,8 @@ def main():
     # Set random seeds for reproducibility across runs
     torch.manual_seed(1337)
     torch.cuda.manual_seed_all(1337)  # For multi-GPU setups
+    g = torch.Generator() 
+    g.manual_seed(1337) # For DataLoader random sampling
 
     # ============================================================================
     # Configuration
@@ -140,29 +145,29 @@ def main():
     # Model and training hyperparameters
     config = {
         # Chunking parameters
-        'chunk_size': 1024,              # Size of each chunk for hierarchical processing
+        "context_length": 1024,              # Size of each chunk for hierarchical processing
         'vocab_size': 50257,             # Vocabulary size (GPT-2 tokenizer)
 
-        # Encoder transformer (processes individual chunks)
-        'enc_d_model': 192,              # Embedding dimension for encoder
-        'enc_nhead': 6,                  # Number of attention heads in encoder
-        'enc_dim_ff': 384,               # Feedforward dimension in encoder
-        'enc_num_layers': 3,             # Number of encoder transformer layers
+        # Encoder GPT-2 (processes individual chunks)
+        "emb_dim": 768,
+        "n_heads": 12,
+        "n_layers": 12,
+        "qkv_bias": True,
 
         # Aggregator transformer (combines chunk representations)
-        'agg_d_model': 128,              # Embedding dimension for aggregator
-        'agg_nhead': 4,                  # Number of attention heads in aggregator
-        'agg_dim_ff': 256,               # Feedforward dimension in aggregator
+        'agg_d_model': 64,              # Embedding dimension for aggregator
+        'agg_nhead': 2,                  # Number of attention heads in aggregator
+        'agg_dim_ff': 128,               # Feedforward dimension in aggregator
         'agg_num_layers': 1,             # Number of aggregator transformer layers
 
         # Sequence parameters
         'max_seq_len': 106578,           # Maximum sequence length (full script)
 
         # Regularization
-        'dropout': 0.35,                  # Dropout probability for all layers
+        "drop_rate": 0.1,                  # Dropout probability for all layers
 
         # Training hyperparameters
-        'batch_size': 2,                 # Number of samples per batch
+        'batch_size': 1,                 # Number of samples per batch
         'peak_lr': 8e-5,                 # Peak learning rate (reached after warmup)
         'weight_decay': 0.08             # L2 regularization coefficient for AdamW
     }
@@ -199,27 +204,48 @@ def main():
     train_dataset = OscarScriptDataset(train_tokenized_items, max_length=config['max_seq_len'])
     val_dataset = OscarScriptDataset(val_tokenized_items, max_length=config['max_seq_len'])
 
+    # Random sampling subset
+    train_sampler = RandomSampler(train_dataset, replacement=False, num_samples=15)
+    val_sampler = RandomSampler(val_dataset, replacement=False, num_samples=15)
+
     # Create dataloaders for batch processing
     print("\nCreating DataLoaders...")
     train_dataloader = DataLoader(
         train_dataset,
         batch_size=config['batch_size'],
-        shuffle=True,                    # Shuffle training data for better generalization
+        sampler=train_sampler,
         num_workers=0                    # Single-threaded loading (set >0 for parallel)
     )
     val_dataloader = DataLoader(
         val_dataset,
         batch_size=config['batch_size'],
-        shuffle=False,                   # No shuffling needed for validation
+        sampler=val_sampler,
         num_workers=0
     )
 
     # ============================================================================
     # Model Initialization
     # ============================================================================
+    print("\nLoading GPT-2 pretrained weights...")
+    gpt_size="124M"
+    gpts_dir="gpt2"
+
+    # Define GPT model path
+    gpt_dir = os.path.join(gpts_dir, gpt_size)
+
+    # Load GPT settings and params
+    tf_ckpt_path = tf.train.latest_checkpoint(gpt_dir)
+
+    settings = json.load(open(os.path.join(gpt_dir, "hparams.json"), "r", encoding="utf-8"))
+    params = load_gpt2_params_from_tf_ckpt(tf_ckpt_path, settings)
     print("\nInitializing model...")
-    model = OscarNomTransformer(config).to(device)
-    print(f"Model parameters: {sum(p.numel() for p in model.parameters()):,}")
+    model = OscarNomGPT(config, params).to(device)
+    total_params = sum(p.numel() for p in model.parameters())
+    trainable_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
+    frozen_params = total_params - trainable_params
+    print(f"Model parameters: {total_params:,}")
+    print(f"Trainable parameters: {trainable_params:,}")
+    print(f"Frozen parameters:    {frozen_params:,}")
 
     # ============================================================================
     # Loss Function and Optimizer
@@ -385,7 +411,7 @@ def main():
         # This implements early stopping: we keep the best model seen so far
         if avg_val_loss < best_val_loss:
             best_val_loss = avg_val_loss
-            checkpoint_path = models_dir / f'transformer_best_ep{epoch+1}.pth'
+            checkpoint_path = models_dir / f'gpt_best_ep{epoch+1}.pth'
 
             # Save complete training state for potential resumption
             torch.save({
