@@ -1,8 +1,15 @@
 import math
+import os
+import json
+import tensorflow as tf
+
+import numpy as np
 
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+
+from gpt_download import load_gpt2_params_from_tf_ckpt
 
 GPT_CONFIG_124M = {
     "vocab_size": 50257,
@@ -173,21 +180,24 @@ class GPTModel(nn.Module):
     
 
 class OscarNomGPT(nn.Module):
-    def __init__(self, config, *args, **kwargs):
+    def __init__(self, config, gpt_params=None, *args, **kwargs):
         super().__init__(*args, **kwargs)
         
         # GPT-based encoder
-        self.chunk_size = config['chunk_size']
-        self.enc_d_model = config["enc_d_model"]
+        self.chunk_size = config["context_length"]
+        self.enc_d_model = config["emb_dim"]
 
         self.encoder = GPTModel(config)
-        # TODO: load pre-trained GPT weights
+        if gpt_params:
+            self.encoder = self._load_weights_into_gpt(self.encoder, gpt_params)
+
+        # TODO: Freeze GPT weights
 
         # TODO: replace last linear layer with this one somehow
-        self.chunk_head = nn.Linear(config["emb_dim"], config["enc_d_model"])
+        self.chunk_head = nn.Linear(config["emb_dim"], config["emb_dim"])
 
-        if config['enc_d_model'] != config['agg_d_model']:
-            self.chunk_proj = nn.Linear(config['enc_d_model'], config['agg_d_model'])
+        if config["emb_dim"] != config['agg_d_model']:
+            self.chunk_proj = nn.Linear(config["emb_dim"], config['agg_d_model'])
         else:
             self.chunk_proj = nn.Identity()
 
@@ -197,21 +207,95 @@ class OscarNomGPT(nn.Module):
         self.agg_dim_ff = config['agg_dim_ff']
         self.agg_num_layers = config['agg_num_layers']
 
-        self.agg_pos_enc = self._positional_encoder(config['max_seq_len'] // config['chunk_size'] + 1, config['agg_d_model'])
+        self.agg_pos_enc = self._positional_encoder(config['max_seq_len'] // config["context_length"] + 1, config['agg_d_model'])
 
         aggregator_layer = nn.TransformerEncoderLayer(
             d_model=config['agg_d_model'],
             nhead=config['agg_nhead'],
             dim_feedforward=config['agg_dim_ff'],
-            dropout=config['dropout'],
+            dropout=config["drop_rate"],
             batch_first=True
         )
         self.aggregator = nn.TransformerEncoder(aggregator_layer, num_layers=config['agg_num_layers'])
 
-        self.dropout= nn.Dropout(config['dropout'])
+        self.dropout= nn.Dropout(config["drop_rate"])
 
         self.classification_head = nn.Linear(config['agg_d_model'], 2)
     
+    def _load_weights_into_gpt(self, gpt, params):
+        def assign(left, right):
+            if left.shape != right.shape:
+                raise ValueError(f"Shape mismatch. Left: {left.shape}, "
+                                "Right: {right.shape}"
+                )
+            return torch.nn.Parameter(torch.tensor(right))
+        
+        # set token and positional embedding weights
+        gpt.pos_emb.weight = assign(gpt.pos_emb.weight, params['wpe'])
+        gpt.tok_emb.weight = assign(gpt.tok_emb.weight, params['wte'])
+
+        for b in range(len(params["blocks"])): # for each transformer block
+
+            # np.split divides weights into three equal parts for query, key, and value components
+            q_w, k_w, v_w = np.split(
+                (params["blocks"][b]["attn"]["c_attn"])["w"], 3, axis=-1)
+            
+            # Q, K, V weights
+            gpt.trf_blocks[b].att.W_query.weight = assign(
+                gpt.trf_blocks[b].att.W_query.weight, q_w.T)
+            gpt.trf_blocks[b].att.W_key.weight = assign(
+                gpt.trf_blocks[b].att.W_key.weight, k_w.T)
+            gpt.trf_blocks[b].att.W_value.weight = assign(
+                gpt.trf_blocks[b].att.W_value.weight, v_w.T)
+            
+            # Q, K, V biases
+            q_b, k_b, v_b = np.split(
+                (params["blocks"][b]["attn"]["c_attn"])["b"], 3, axis=-1)
+            gpt.trf_blocks[b].att.W_query.bias = assign(
+                gpt.trf_blocks[b].att.W_query.bias, q_b)
+            gpt.trf_blocks[b].att.W_key.bias = assign(
+                gpt.trf_blocks[b].att.W_key.bias, k_b)
+            gpt.trf_blocks[b].att.W_value.bias = assign(
+                gpt.trf_blocks[b].att.W_value.bias, v_b)
+            gpt.trf_blocks[b].att.out_proj.weight = assign(
+                gpt.trf_blocks[b].att.out_proj.weight,
+                params["blocks"][b]["attn"]["c_proj"]["w"].T)
+            gpt.trf_blocks[b].att.out_proj.bias = assign(
+                gpt.trf_blocks[b].att.out_proj.bias,
+                params["blocks"][b]["attn"]["c_proj"]["b"])
+            gpt.trf_blocks[b].ff.layers[0].weight = assign(
+                gpt.trf_blocks[b].ff.layers[0].weight,
+                params["blocks"][b]["mlp"]["c_fc"]["w"].T)
+            gpt.trf_blocks[b].ff.layers[0].bias = assign(
+                gpt.trf_blocks[b].ff.layers[0].bias,
+                params["blocks"][b]["mlp"]["c_fc"]["b"])
+            gpt.trf_blocks[b].ff.layers[2].weight = assign(
+                gpt.trf_blocks[b].ff.layers[2].weight,
+                params["blocks"][b]["mlp"]["c_proj"]["w"].T)
+            gpt.trf_blocks[b].ff.layers[2].bias = assign(
+                gpt.trf_blocks[b].ff.layers[2].bias,
+                params["blocks"][b]["mlp"]["c_proj"]["b"])
+            gpt.trf_blocks[b].norm1.scale = assign(
+                gpt.trf_blocks[b].norm1.scale,
+                params["blocks"][b]["ln_1"]["g"])
+            gpt.trf_blocks[b].norm1.shift = assign(
+                gpt.trf_blocks[b].norm1.shift,
+                params["blocks"][b]["ln_1"]["b"])
+            gpt.trf_blocks[b].norm2.scale = assign(
+                gpt.trf_blocks[b].norm2.scale,
+                params["blocks"][b]["ln_2"]["g"])
+            gpt.trf_blocks[b].norm2.shift = assign(
+                gpt.trf_blocks[b].norm2.shift,
+                params["blocks"][b]["ln_2"]["b"])
+            
+        gpt.final_norm.scale = assign(gpt.final_norm.scale, params["g"])
+        gpt.final_norm.shift = assign(gpt.final_norm.shift, params["b"])
+
+        # weight tying
+        # re-use weights of the token embedding layer now in the output layer
+        gpt.out_head.weight = assign(gpt.out_head.weight, params["wte"])
+        return gpt
+
     def _positional_encoder(self, max_seq_len, d_model):
         position = torch.arange(max_seq_len).unsqueeze(1)
         div_term = torch.exp(torch.arange(0, d_model, 2) * -(math.log(10000.0) / d_model))
@@ -268,4 +352,38 @@ class OscarNomGPT(nn.Module):
 
         return logits
 
-    
+if __name__ == "__main__":
+    torch.manual_seed(1337)
+    device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
+
+    model_size="124M"
+    models_dir="gpt2"
+
+    # Define GPT model path
+    model_dir = os.path.join("src", models_dir, model_size)
+
+    # Load GPT settings and params
+    tf_ckpt_path = tf.train.latest_checkpoint(model_dir)
+
+    settings = json.load(open(os.path.join(model_dir, "hparams.json"), "r", encoding="utf-8"))
+    params = load_gpt2_params_from_tf_ckpt(tf_ckpt_path, settings)
+
+    config = {
+        "vocab_size": 50257,
+        "context_length": 1024,
+        "emb_dim": 768,
+        "n_heads": 12,
+        "n_layers": 12,
+
+        'agg_d_model': 64,
+        'agg_nhead': 2,
+        'agg_dim_ff': 128,
+        'agg_num_layers': 1,
+        
+        'max_seq_len': 106578,
+
+        "drop_rate": 0.1,
+        "qkv_bias": True
+    }
+
+    model = OscarNomGPT(config, params).to(device)
