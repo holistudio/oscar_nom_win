@@ -200,9 +200,6 @@ class OscarNomGPT(nn.Module):
         for param in self.encoder.parameters():
             param.requires_grad = False
 
-        # TODO: replace last linear layer with this one somehow
-        self.chunk_head = nn.Linear(config["emb_dim"], config["emb_dim"])
-
         if config["emb_dim"] != config['agg_d_model']:
             self.chunk_proj = nn.Linear(config["emb_dim"], config['agg_d_model'])
         else:
@@ -395,3 +392,16 @@ if __name__ == "__main__":
     }
 
     model = OscarNomGPT(config, params).to(device)
+
+    batch_size = 1
+    src_seq_len = 106578
+
+    src = torch.randint(0, config['vocab_size'], (batch_size, src_seq_len)).to(device)
+
+    print(f"Model parameters: {sum(p.numel() for p in model.parameters()):,}")
+    print(f"Source shape: {src.shape}")
+    print("Running forward pass...")
+    logits = model(src)
+
+    print(f"Output logits shape: {logits.shape}")
+    print(f"Logits:\n{logits}")
