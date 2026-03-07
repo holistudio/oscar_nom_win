@@ -181,6 +181,7 @@ class GPTModel(nn.Module):
 
 class OscarNomGPT(nn.Module):
     def __init__(self, config, gpt_params=None, *args, **kwargs):
+        """NOTE: even if gpt_params are not provided, GPTModel weights will be frozen"""
         super().__init__(*args, **kwargs)
         
         # GPT-based encoder
@@ -190,8 +191,10 @@ class OscarNomGPT(nn.Module):
         self.encoder = GPTModel(config)
         if gpt_params:
             self.encoder = self._load_weights_into_gpt(self.encoder, gpt_params)
-
-        # TODO: Freeze GPT weights
+        
+        # freeze GPT weights
+        for param in self.encoder.parameters():
+            param.requires_grad = False
 
         # TODO: replace last linear layer with this one somehow
         self.chunk_head = nn.Linear(config["emb_dim"], config["emb_dim"])
@@ -321,9 +324,10 @@ class OscarNomGPT(nn.Module):
         src = src.view((batch_size, num_chunks, self.chunk_size))
         src = src.view((batch_size * num_chunks, self.chunk_size))
 
-        # 2. GPT-2 encodes the input into embedings
+        # 2. Frozen GPT-2 encodes the input into embedings
         # Shape after encoder: (batch_size * num_chunks, chunk_size, enc_d_model)
-        enc_chunks = self.encoder(src)
+        with torch.no_grad():
+            enc_chunks = self.encoder(src)
 
         # 3. Pool each chunk to single vector (mean pool over token dimension)
         # Shape: (batch_size * num_chunks, enc_d_model)
