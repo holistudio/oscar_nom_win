@@ -1,5 +1,8 @@
+import math
+
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 
 GPT_CONFIG_124M = {
     "vocab_size": 50257,
@@ -167,3 +170,102 @@ class GPTModel(nn.Module):
         x = self.final_norm(x)
         logits = self.out_head(x)
         return logits
+    
+
+class OscarNomGPT(nn.Module):
+    def __init__(self, config, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        
+        # GPT-based encoder
+        self.chunk_size = config['chunk_size']
+        self.enc_d_model = config["enc_d_model"]
+
+        self.encoder = GPTModel(config)
+        # TODO: load pre-trained GPT weights
+
+        # TODO: replace last linear layer with this one somehow
+        self.chunk_head = nn.Linear(config["emb_dim"], config["enc_d_model"])
+
+        if config['enc_d_model'] != config['agg_d_model']:
+            self.chunk_proj = nn.Linear(config['enc_d_model'], config['agg_d_model'])
+        else:
+            self.chunk_proj = nn.Identity()
+
+        # aggregator
+        self.agg_d_model = config['agg_d_model']
+        self.agg_nhead = config['agg_nhead']
+        self.agg_dim_ff = config['agg_dim_ff']
+        self.agg_num_layers = config['agg_num_layers']
+
+        self.agg_pos_enc = self._positional_encoder(config['max_seq_len'] // config['chunk_size'] + 1, config['agg_d_model'])
+
+        aggregator_layer = nn.TransformerEncoderLayer(
+            d_model=config['agg_d_model'],
+            nhead=config['agg_nhead'],
+            dim_feedforward=config['agg_dim_ff'],
+            dropout=config['dropout'],
+            batch_first=True
+        )
+        self.aggregator = nn.TransformerEncoder(aggregator_layer, num_layers=config['agg_num_layers'])
+
+        self.dropout= nn.Dropout(config['dropout'])
+
+        self.classification_head = nn.Linear(config['agg_d_model'], 2)
+    
+    def _positional_encoder(self, max_seq_len, d_model):
+        position = torch.arange(max_seq_len).unsqueeze(1)
+        div_term = torch.exp(torch.arange(0, d_model, 2) * -(math.log(10000.0) / d_model))
+        pe = torch.zeros(max_seq_len, d_model)
+        pe[:, 0::2] = torch.sin(position * div_term)
+        pe[:, 1::2] = torch.cos(position * div_term)
+        return pe.unsqueeze(0)
+    
+    def forward(self, src):
+        batch_size, seq_len = src.shape
+
+        # 1. Chunk the input
+        # Pad seq_len to be divisible by chunk_size
+        remainder = seq_len % self.chunk_size
+        if remainder != 0 :
+            pad_len = self.chunk_size - remainder
+            src = F.pad(src, (0, pad_len), value=0)
+            seq_len = src.shape[1]
+
+        num_chunks = seq_len // self.chunk_size
+
+        # Then reshape to (batch_size * num_chunks, chunk_size)
+        src = src.view((batch_size, num_chunks, self.chunk_size))
+        src = src.view((batch_size * num_chunks, self.chunk_size))
+
+        # 2. GPT-2 encodes the input into embedings
+        # Shape after encoder: (batch_size * num_chunks, chunk_size, enc_d_model)
+        enc_chunks = self.encoder(src)
+
+        # 3. Pool each chunk to single vector (mean pool over token dimension)
+        # Shape: (batch_size * num_chunks, enc_d_model)
+        chunk_embs = enc_chunks.mean(dim=1)
+
+        # 4. Reshape back to (batch_size, num_chunks, enc_d_model)
+        chunk_embs = chunk_embs.view((batch_size,num_chunks, self.enc_d_model))
+
+        # 5. Project if needed and add chunk positional encoding
+        # Shape: (batch_size, num_chunks, agg_d_model)
+        chunk_embs = self.chunk_proj(chunk_embs) * math.sqrt(self.agg_d_model)
+        chunk_embs += self.agg_pos_enc[:, :num_chunks, :].to(chunk_embs.device)
+        chunk_embs = self.dropout(chunk_embs)
+
+        # 6. Run through aggregator transformer
+        # Shape (batch_size, num_chunks, agg_d_model)
+        agg_out = self.aggregator(chunk_embs)
+
+        # 7. Pool to single vector (mean pool over chunk dimension)
+        # Shape: (batch_size, agg_d_model)
+        agg_out = agg_out.mean(dim=1)
+
+        # 8. Classification head
+        # Shape: (batch_size, 2)
+        logits = self.classification_head(agg_out)
+
+        return logits
+
+    
