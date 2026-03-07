@@ -16,6 +16,7 @@ self.out_head = nn.Linear(
 - but if they are, the out_head for `GPTModel` is a bit redundant.
 - The positional encoder for the encoder in `OscarNomTransformer` is probably not necessary since `GPTModel` will apply its own position encoding to the input now. 
 - But the `agg_pos_enc` will remain as the sinusoidal positional encoder (this could be worth revisiting later)
+- Basic test runs seem to suggest it's basically not possible to finetune the GPT-2 model weights on a 4090 laptop GPU because a single data sample is so big that the 12-headed, 12 layered "small" GPT-2 has to still compute all the chunks in a single forward pass, which can't fit on 16GB of memory.
 
 Changes needed for `train.py`
 - line 141-168 defines a config specific to the chunky transformer. to adapt this to chunky GPT, the `config` variable should be loaded from a separate JSON file or something
