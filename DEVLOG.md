@@ -1,5 +1,31 @@
 # Development Log
 
+## 2026-03-07
+
+Freezing GPT-2 weights is probably the way to go but for future reference/consideration, Raschka also unfroze the last transformer block/layer for classification fine-tuning:
+
+```python
+# UNFREEZE last transformer block and layer norm
+for param in model.trf_blocks[-1].parameters():
+    param.requires_grad = True
+
+for param in model.final_norm.parameters():
+    param.requires_grad = True
+```
+(but this might run the risk of out-of-memory as well)
+
+A single sample takes about a 2 min (batch_size=2 runs out of CUDA memory):
+- 1320 samples in training
+- Typically only 10 epochs
+- So... 10 x 1320 x 2min = a very long time (440 hrs)
+- We can try to cut back with just seeing performance after two epochs = 88 hrs
+- That still takes forever so we could consider cutting back the number of samples per epoch and randomly choosing them.
+- If we only look at 100 random samples per epoch: 3 x 100 x 2min = 10 hrs (three epochs)
+
+For a very controlled experiment this should carry back over to the training for the chunky transformer.
+
+Until I can see if using cloud GPU resources might make things faster, hyperparameter tuning via Raytune also feels like overkill for now.
+
 ## 2026-03-06
 
 Things to consider for `OscarNomGPT` class
