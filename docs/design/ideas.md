@@ -45,7 +45,7 @@ global dataset: mean=790.9, min=14, max=2282
 ```
 
 Training-validation-test samples:
-`(1320, 440, 440)`
+`(1320, 440, 440)`  2200 total
 
 Imbalance percent nominations/wins
 
