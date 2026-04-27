@@ -104,10 +104,40 @@ def main():
     )
 
     # optimizer 
+    peak_lr = training_cfg.get('peak_lr', 3e-4)
     optimizer = torch.optim.AdamW(
         model.parameters(),
-        lr=training_cfg.get('peak_lr', 3e-4),
+        lr=peak_lr,
         weight_decay=training_cfg.get('weight_decay', 0.1)
     )
 
-    # TODO: load latest model weights and training/optimizer steps
+    # learning rate scheduler
+    num_epochs = training_cfg['epochs']
+    eta_min = training_cfg.get('eta_min', 1e-6)
+    warmup_fraction = training_cfg.get('warmup_fraction', 0.1)
+
+    total_steps = num_epochs * len(train_dataloader)
+    warmup_steps = max(1, int(warmup_fraction * total_steps))
+    cosine_steps = total_steps - warmup_steps
+
+    warmup_scheduler = torch.optim.lr_scheduler.LinearLR(
+        optimizer,
+        start_factor=eta_min/peak_lr,
+        end_factor=1.0,
+        total_iters=warmup_steps
+    )
+    cosine_scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
+        optimizer,
+        T_max=cosine_steps,
+        eta_min=eta_min
+    )
+    scheduler = torch.optim.lr_scheduler.SequentialLR(
+        optimizer,
+        schedulers=[warmup_scheduler, cosine_scheduler],
+        milestones=[warmup_steps],
+    )
+
+    # gradient clipping
+    grad_clip = training_cfg.get('grad_clip', 1.0)
+    
+    # TODO: load latest model weights and training/optimizer steps/learning rate schedule
