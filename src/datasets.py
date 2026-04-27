@@ -2,13 +2,13 @@ import torch
 from torch.utils.data import Dataset
 
 class OscarScriptDataset(Dataset):
-    """Pre-tokenized movie scripts paired with binary Oscar-nomination labels.
+    """Pre-tokenized movie screenplays paired with binary Oscar-nomination labels.
     Sequences are right-padded with 0 or truncated to `max_length`.
     """
 
     def __init__(self, tokenized_items, max_length=5000):
         self.max_length = max_length
-        print(f"Processing {len(tokenized_items)} pre-tokenized scripts...")
+        print(f"Processing {len(tokenized_items)} pre-tokenized screenplays into Datasets...")
         self.inputs = []
         self.targets = []
 
@@ -22,9 +22,9 @@ class OscarScriptDataset(Dataset):
             self.targets.append(torch.tensor(item['target'], dtype=torch.long))
 
             if (idx + 1) % 100 == 0:
-                print(f"  Processed {idx + 1}/{len(tokenized_items)} scripts")
+                print(f"  Processed {idx + 1}/{len(tokenized_items)} screenplays")
 
-        print("Processing complete!")
+        print("Processing Datasets complete!")
 
     def __len__(self):
         return len(self.inputs)
