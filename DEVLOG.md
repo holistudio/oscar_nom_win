@@ -1,5 +1,29 @@
 # Development Log
 
+## 2026-04-24
+
+Circling back to this...
+
+Couple thing I'm most interested in doing:
+- Revisit chunky transformer model
+- Figure out how `train.py` can take any arbitrary model architecture and train it
+- See what it would take to train models on RunPod
+- Look at distributions of words in the dataset: are there words that show up more frequently in Oscar nominated films or not?
+- A similar question can be asked for the model predictions (i.e. "the model seems to think that words X, Y, Z increase probability...")
+
+Did a visual documentation of how the current chunky transformer model works. While I think it's OK, it feels like it works differently than how I originally imagined it to work. And it feels like the mean pooling is doing a lot of heavy lifting to compress things.
+
+diagram tk
+
+From Raschka's *Building LLMs from Scratch* book chapter on classification fine tuning I was thinking of some other way that involves a Transformer Decoder with causal attention mask.
+
+diagram tk
+
+Will revisit this later but first a recap of what the `src` and `notebooks` files are doing and how they relate to each other
+
+
+### Recap of models made so far
+
 ## 2026-03-07
 
 Freezing GPT-2 weights is probably the way to go but for future reference/consideration, Raschka also unfroze the last transformer block/layer for classification fine-tuning:
