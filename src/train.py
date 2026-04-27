@@ -2,6 +2,7 @@ import argparse
 import json
 import pickle
 import importlib
+from pathlib import Path
 
 import torch
 import torch.nn as nn
@@ -137,7 +138,16 @@ def main():
         milestones=[warmup_steps],
     )
 
+    # TODO: load latest model weights and training/optimizer steps/learning rate schedule
+
     # gradient clipping
     grad_clip = training_cfg.get('grad_clip', 1.0)
+
+    # save model and results to appropriate directories
+    # TODO: save to a subdirectory specified in config
+    checkpoint_prefix = training_cfg.get('checkpoint_prefix', 'model')
     
-    # TODO: load latest model weights and training/optimizer steps/learning rate schedule
+    models_dir = Path(training_cfg.get('models_dir', '../models'))
+    results_dir = Path(training_cfg.get('results_dir', '../results'))
+    models_dir.mkdir(exist_ok=True, parents=True)
+    results_dir.mkdir(exist_ok=True, parents=True)
