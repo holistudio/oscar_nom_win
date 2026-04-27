@@ -25,3 +25,6 @@ def main():
     torch.cuda.manual_seed_all(seed)
     generator = torch.Generator()
     generator.manual_seed(seed)
+
+    # CUDA device
+    device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
