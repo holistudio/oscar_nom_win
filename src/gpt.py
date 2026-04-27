@@ -365,7 +365,7 @@ if __name__ == "__main__":
     models_dir="gpt2"
 
     # Define GPT model path
-    model_dir = os.path.join("src", models_dir, model_size)
+    model_dir = os.path.join(models_dir, model_size)
 
     # Load GPT settings and params
     tf_ckpt_path = tf.train.latest_checkpoint(model_dir)
@@ -380,9 +380,9 @@ if __name__ == "__main__":
         "n_heads": 12,
         "n_layers": 12,
 
-        'agg_d_model': 64,
-        'agg_nhead': 2,
-        'agg_dim_ff': 128,
+        'agg_d_model': 128,
+        'agg_nhead': 4,
+        'agg_dim_ff': 256,
         'agg_num_layers': 1,
         
         'max_seq_len': 106578,
