@@ -3,6 +3,7 @@ import json
 import pickle
 import importlib
 from pathlib import Path
+import time
 
 import torch
 import torch.nn as nn
@@ -151,3 +152,98 @@ def main():
     results_dir = Path(training_cfg.get('results_dir', '../results'))
     models_dir.mkdir(exist_ok=True, parents=True)
     results_dir.mkdir(exist_ok=True, parents=True)
+
+    # training loop logging
+    history = {'train_loss': [], 'val_loss':[]}
+    best_val_loss = float('inf')
+    best_path = models_dir / f'{checkpoint_prefix}_best.pth'
+
+    training_start_time = time.time()
+    epoch_times = []
+
+    # training + validation loop
+    for epoch in range(num_epochs):
+        epoch_start_time = time.time()
+        
+        # training step
+        model.train()
+        train_losses = []
+        for batch in train_dataloader:
+            input_ids = batch['input_ids'].to(device)
+            targets = batch['target'].to(device)
+
+            optimizer.zero_grad()
+            logits = model(input_ids)
+            loss = criterion(logits, targets)
+            loss.backward()
+            
+            torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=grad_clip)
+
+            optimizer.step()
+            scheduler.step()
+
+            train_losses.append(loss.item())
+        avg_train_loss = sum(train_losses) / len(train_losses)
+
+        # validation step
+        model.eval()
+        val_losses = []
+        for batch in val_dataloader:
+            input_ids = batch['input_ids'].to(device)
+            targets = batch['target'].to(device)
+            
+            logits = model(input_ids)
+            loss = criterion(logits, targets)
+            
+            val_losses.append(loss.item())
+        avg_val_loss = sum(val_losses) / len(val_losses)
+
+        # log and checkpoint
+        epoch_time = time.time() - epoch_start_time
+        epoch_times.append(epoch_time)
+        elapsed_time = time.time() - training_start_time
+        avg_epoch_time = sum(epoch_times) / len(epoch_times)
+        elapsed_str = time.strftime("%H:%M:%S", time.gmtime(elapsed_time))
+        avg_time_str = time.strftime("%H:%M:%S", time.gmtime(avg_epoch_time))
+
+        history['train_loss'].append(avg_train_loss)
+        history['val_loss'].append(avg_val_loss)
+
+        if avg_val_loss < best_val_loss:
+            best_val_loss = avg_val_loss
+
+            # save checkpoint
+            checkpoint_path = models_dir / f'{checkpoint_prefix}_ep{epoch+1}.pth'
+            torch.save({
+                'epoch': epoch + 1,
+                'model_state_dict': model.state_dict(),
+                'optimizer_state_dict': optimizer.state_dict(),
+                'scheduler_state_dict': scheduler.state_dict(),
+                'train_loss': avg_train_loss,
+                'val_loss': avg_val_loss,
+                'config': cfg
+            }, checkpoint_path)
+
+            # save/overwrite "best_model" file
+            torch.save({
+                'epoch': epoch + 1,
+                'model_state_dict': model.state_dict(),
+                'optimizer_state_dict': optimizer.state_dict(),
+                'scheduler_state_dict': scheduler.state_dict(),
+                'train_loss': avg_train_loss,
+                'val_loss': avg_val_loss,
+                'config': cfg
+            }, best_path)
+            print(f"Epoch [{epoch+1}/{num_epochs}] - Train Loss: {avg_train_loss:.4f}, "
+                  f"Val Loss: {avg_val_loss:.4f} - Elapsed: {elapsed_str}, "
+                  f"Avg/Epoch: {avg_time_str} - New best! Model saved.")
+        else:
+            print(f"Epoch [{epoch+1}/{num_epochs}] - Train Loss: {avg_train_loss:.4f}, "
+                  f"Val Loss: {avg_val_loss:.4f} - Elapsed: {elapsed_str}, "
+                  f"Avg/Epoch: {avg_time_str}")
+    
+    # save training history
+    history_filename = training_cfg.get('history_filename', 'training_history.json')
+    history_file = results_dir / history_filename
+    with open(history_file, 'w') as f:
+        json.dump(history, f, indent=2)
