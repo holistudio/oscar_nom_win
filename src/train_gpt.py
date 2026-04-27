@@ -155,9 +155,9 @@ def main():
         "qkv_bias": True,
 
         # Aggregator transformer (combines chunk representations)
-        'agg_d_model': 64,              # Embedding dimension for aggregator
-        'agg_nhead': 2,                  # Number of attention heads in aggregator
-        'agg_dim_ff': 128,               # Feedforward dimension in aggregator
+        'agg_d_model': 128,              # Embedding dimension for aggregator
+        'agg_nhead': 4,                  # Number of attention heads in aggregator
+        'agg_dim_ff': 256,               # Feedforward dimension in aggregator
         'agg_num_layers': 1,             # Number of aggregator transformer layers
 
         # Sequence parameters
@@ -205,8 +205,8 @@ def main():
     val_dataset = OscarScriptDataset(val_tokenized_items, max_length=config['max_seq_len'])
 
     # Random sampling subset
-    train_sampler = RandomSampler(train_dataset, replacement=False, num_samples=15)
-    val_sampler = RandomSampler(val_dataset, replacement=False, num_samples=15)
+    train_sampler = RandomSampler(train_dataset, replacement=False, num_samples=185)
+    val_sampler = RandomSampler(val_dataset, replacement=False, num_samples=122)
 
     # Create dataloaders for batch processing
     print("\nCreating DataLoaders...")
