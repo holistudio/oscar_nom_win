@@ -1,6 +1,7 @@
 import argparse
 import json
 import pickle
+import importlib
 
 import torch
 from torch.utils.data import DataLoader, RandomSampler
@@ -33,6 +34,16 @@ def build_dataloaders(train_dataset, val_dataset, training_cfg, data_cfg, genera
         val_dataloader = DataLoader(val_dataset, batch_size=bs,
                                     shuffle=True)
     return train_dataloader, val_dataloader
+
+def import_model_class(module_name, class_name):
+    module = importlib.import_module(module_name)
+    return getattr(module, class_name)
+
+def build_model(model_cfg, device):
+    ModelClass = import_model_class(model_cfg['module'], model_cfg['class_name'])
+
+    model = ModelClass(model_cfg['params']).to(device)
+    return model
 
 def main():
     # argument parsing
@@ -73,3 +84,14 @@ def main():
 
     train_dataloader, val_dataloader = build_dataloaders(train_dataset, val_dataset,
                                                          training_cfg, data_cfg, generator)
+    
+    # define model
+    model = build_model(model_cfg, device)
+    total_params = sum(p.numel() for p in model.parameters())
+    trainable_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
+    frozen_params = total_params - trainable_params
+    print(f"Total model parameters: {total_params:,}")
+    print(f"Trainable model parameters: {trainable_params:,}")
+    print(f"Frozen model parameters: {frozen_params:,}")
+    
+    # TODO: load latest model weights and training/optimizer steps
