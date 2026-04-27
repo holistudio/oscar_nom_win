@@ -190,6 +190,9 @@
         <mxCell id="pq0AM1h1IiiyBDEnBlEK-64" value="01_data_exp...&lt;div&gt;03_test_...&lt;/div&gt;&lt;div&gt;&lt;br&gt;&lt;/div&gt;&lt;div&gt;What&#39;s 02?&lt;/div&gt;&lt;div&gt;&lt;br&gt;&lt;/div&gt;&lt;div&gt;Word distributions?&lt;/div&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;verticalAlign=top;align=left;spacingLeft=6;spacingRight=6;" vertex="1" parent="1">
           <mxGeometry x="840" y="1000" width="130" height="110" as="geometry" />
         </mxCell>
+        <mxCell id="pq0AM1h1IiiyBDEnBlEK-65" value="TODOS:&lt;div&gt;This is all on chunky_gpt branch&lt;/div&gt;&lt;div&gt;&lt;br&gt;&lt;/div&gt;&lt;div&gt;- is chunky_transformer branch ahead of main? if so, pull request into main for that first and compare changes&lt;/div&gt;&lt;div&gt;&lt;br&gt;&lt;/div&gt;&lt;div&gt;- then look at chunky_gpt and pull-request into main&lt;/div&gt;&lt;div&gt;&lt;br&gt;&lt;/div&gt;&lt;div&gt;- get everything back onto main before archiving, moving things around&lt;/div&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;verticalAlign=top;align=left;spacingLeft=6;spacingRight=6;" vertex="1" parent="1">
+          <mxGeometry x="1590" y="160" width="200" height="220" as="geometry" />
+        </mxCell>
       </root>
     </mxGraphModel>
   </diagram>
