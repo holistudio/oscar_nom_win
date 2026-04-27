@@ -1,6 +1,8 @@
 import argparse
 import json
 
+import torch
+
 def main():
     # argument parsing
     parser = argparse.ArgumentParser(description='Oscar nomination prediction model trainer')
@@ -16,3 +18,10 @@ def main():
     data_cfg = cfg['data']
     model_cfg = cfg['model']
     training_cfg = cfg['training']
+
+    # seeds for reproducibility
+    seed = training_cfg.get('seed', 1337)
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)
+    generator = torch.Generator()
+    generator.manual_seed(seed)
