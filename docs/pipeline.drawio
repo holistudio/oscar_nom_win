@@ -1,0 +1,196 @@
+<mxfile host="Electron" agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) draw.io/26.2.15 Chrome/134.0.6998.205 Electron/35.2.1 Safari/537.36" version="26.2.15">
+  <diagram name="Page-1" id="1mWR79oaiYvkCJZ35Sl9">
+    <mxGraphModel dx="2431" dy="1414" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="0" pageScale="1" pageWidth="850" pageHeight="1100" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="pq0AM1h1IiiyBDEnBlEK-38" value="gpt.py" style="rounded=0;whiteSpace=wrap;html=1;verticalAlign=top;" vertex="1" parent="1">
+          <mxGeometry x="1630" y="940" width="160" height="100" as="geometry" />
+        </mxCell>
+        <mxCell id="pq0AM1h1IiiyBDEnBlEK-28" value="transformer.py" style="rounded=0;whiteSpace=wrap;html=1;verticalAlign=top;" vertex="1" parent="1">
+          <mxGeometry x="1400" y="510" width="200" height="100" as="geometry" />
+        </mxCell>
+        <mxCell id="pq0AM1h1IiiyBDEnBlEK-20" value="src/tokenized/" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;fontColor=#333333;strokeColor=#666666;verticalAlign=top;" vertex="1" parent="1">
+          <mxGeometry x="1220" y="600" width="160" height="120" as="geometry" />
+        </mxCell>
+        <mxCell id="pq0AM1h1IiiyBDEnBlEK-22" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0;entryY=0.5;entryDx=0;entryDy=0;exitX=1;exitY=0.5;exitDx=0;exitDy=0;" edge="1" parent="1" source="pq0AM1h1IiiyBDEnBlEK-15" target="pq0AM1h1IiiyBDEnBlEK-21">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="pq0AM1h1IiiyBDEnBlEK-13" value="data/processed/" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;fontColor=#333333;strokeColor=#666666;verticalAlign=top;" vertex="1" parent="1">
+          <mxGeometry x="840" y="600" width="200" height="120" as="geometry" />
+        </mxCell>
+        <mxCell id="pq0AM1h1IiiyBDEnBlEK-18" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;" edge="1" parent="1" source="pq0AM1h1IiiyBDEnBlEK-12" target="pq0AM1h1IiiyBDEnBlEK-17">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="pq0AM1h1IiiyBDEnBlEK-6" value="data/raw/" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;fontColor=#333333;strokeColor=#666666;verticalAlign=top;" vertex="1" parent="1">
+          <mxGeometry x="380" y="520" width="160" height="200" as="geometry" />
+        </mxCell>
+        <mxCell id="pq0AM1h1IiiyBDEnBlEK-4" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="pq0AM1h1IiiyBDEnBlEK-1" target="pq0AM1h1IiiyBDEnBlEK-3">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="pq0AM1h1IiiyBDEnBlEK-1" value="Movie-O-Label" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f5f5f5;fontColor=#333333;strokeColor=#666666;" vertex="1" parent="1">
+          <mxGeometry x="400" y="560" width="120" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="pq0AM1h1IiiyBDEnBlEK-5" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="pq0AM1h1IiiyBDEnBlEK-2" target="pq0AM1h1IiiyBDEnBlEK-3">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="pq0AM1h1IiiyBDEnBlEK-19" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0;entryY=0.5;entryDx=0;entryDy=0;exitX=0.5;exitY=1;exitDx=0;exitDy=0;" edge="1" parent="1" source="pq0AM1h1IiiyBDEnBlEK-2" target="pq0AM1h1IiiyBDEnBlEK-17">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="pq0AM1h1IiiyBDEnBlEK-2" value="oscars.csv" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f5f5f5;fontColor=#333333;strokeColor=#666666;" vertex="1" parent="1">
+          <mxGeometry x="400" y="640" width="120" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="pq0AM1h1IiiyBDEnBlEK-9" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="pq0AM1h1IiiyBDEnBlEK-3" target="pq0AM1h1IiiyBDEnBlEK-12">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="pq0AM1h1IiiyBDEnBlEK-3" value="00_data_processing.ipynb" style="rounded=0;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+          <mxGeometry x="600" y="640" width="200" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="pq0AM1h1IiiyBDEnBlEK-7" value="this is mainly to make sure the datasets have accurate labels for oscar winners...but for now the models are predicting oscar nominations only." style="rounded=0;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;verticalAlign=top;align=left;spacingLeft=6;spacingRight=6;" vertex="1" parent="1">
+          <mxGeometry x="600" y="720" width="200" height="100" as="geometry" />
+        </mxCell>
+        <mxCell id="pq0AM1h1IiiyBDEnBlEK-16" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="pq0AM1h1IiiyBDEnBlEK-8" target="pq0AM1h1IiiyBDEnBlEK-15">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="pq0AM1h1IiiyBDEnBlEK-8" value="token_dataset.py" style="rounded=0;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+          <mxGeometry x="1080" y="640" width="120" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="pq0AM1h1IiiyBDEnBlEK-11" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="pq0AM1h1IiiyBDEnBlEK-10" target="pq0AM1h1IiiyBDEnBlEK-8">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="pq0AM1h1IiiyBDEnBlEK-10" value="GPT-2 tokenization encoding" style="rounded=0;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+          <mxGeometry x="1080" y="540" width="120" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="pq0AM1h1IiiyBDEnBlEK-14" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="pq0AM1h1IiiyBDEnBlEK-12" target="pq0AM1h1IiiyBDEnBlEK-8">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="pq0AM1h1IiiyBDEnBlEK-12" value="train_clean.parquet&lt;div&gt;val_clean.parquet&lt;/div&gt;&lt;div&gt;test_clean.parquet&lt;/div&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f5f5f5;fontColor=#333333;strokeColor=#666666;" vertex="1" parent="1">
+          <mxGeometry x="880" y="640" width="120" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="pq0AM1h1IiiyBDEnBlEK-24" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="pq0AM1h1IiiyBDEnBlEK-15" target="pq0AM1h1IiiyBDEnBlEK-23">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="pq0AM1h1IiiyBDEnBlEK-33" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="pq0AM1h1IiiyBDEnBlEK-15" target="pq0AM1h1IiiyBDEnBlEK-32">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="pq0AM1h1IiiyBDEnBlEK-35" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="pq0AM1h1IiiyBDEnBlEK-15" target="pq0AM1h1IiiyBDEnBlEK-34">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="pq0AM1h1IiiyBDEnBlEK-61" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="pq0AM1h1IiiyBDEnBlEK-15" target="pq0AM1h1IiiyBDEnBlEK-58">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="pq0AM1h1IiiyBDEnBlEK-62" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="pq0AM1h1IiiyBDEnBlEK-15" target="pq0AM1h1IiiyBDEnBlEK-59">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="pq0AM1h1IiiyBDEnBlEK-15" value="train_tokenized.pkl&lt;div&gt;val_tokenized.pkl&lt;/div&gt;&lt;div&gt;test_tokenized.pkl&lt;/div&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f5f5f5;fontColor=#333333;strokeColor=#666666;" vertex="1" parent="1">
+          <mxGeometry x="1240" y="640" width="120" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="pq0AM1h1IiiyBDEnBlEK-17" value="01_data_exploration.ipynb" style="rounded=0;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+          <mxGeometry x="840" y="920" width="200" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="pq0AM1h1IiiyBDEnBlEK-21" value="train.py" style="rounded=0;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+          <mxGeometry x="1440" y="640" width="120" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="pq0AM1h1IiiyBDEnBlEK-23" value="test.py" style="rounded=0;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+          <mxGeometry x="1440" y="740" width="120" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="pq0AM1h1IiiyBDEnBlEK-25" value="contains OscarNomTransformer class definition within the file for some reason..." style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;verticalAlign=top;align=left;spacingLeft=6;spacingRight=6;" vertex="1" parent="1">
+          <mxGeometry x="1580" y="740" width="200" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="pq0AM1h1IiiyBDEnBlEK-27" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" edge="1" parent="1" source="pq0AM1h1IiiyBDEnBlEK-26" target="pq0AM1h1IiiyBDEnBlEK-21">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="pq0AM1h1IiiyBDEnBlEK-26" value="OscarNomTransformer" style="rounded=0;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+          <mxGeometry x="1420" y="540" width="160" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="pq0AM1h1IiiyBDEnBlEK-30" value="train.py seems to only work with OscarNomTransformer and not with OscarNomGPT..." style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;verticalAlign=top;align=left;spacingLeft=6;spacingRight=6;" vertex="1" parent="1">
+          <mxGeometry x="1620" y="510" width="200" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="pq0AM1h1IiiyBDEnBlEK-31" value="technically not really necessary with 03_test_metrics.ipynb doing the same thing...?" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;verticalAlign=top;align=left;spacingLeft=6;spacingRight=6;" vertex="1" parent="1">
+          <mxGeometry x="1790" y="740" width="200" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="pq0AM1h1IiiyBDEnBlEK-32" value="train_gpt.py" style="rounded=0;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+          <mxGeometry x="1440" y="1080" width="360" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="pq0AM1h1IiiyBDEnBlEK-34" value="03_test_metrics.ipynb" style="rounded=0;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+          <mxGeometry x="1440" y="1400" width="160" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="pq0AM1h1IiiyBDEnBlEK-36" value="shouldn&#39;t these be in the data folder??" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;verticalAlign=top;align=left;spacingLeft=6;spacingRight=6;" vertex="1" parent="1">
+          <mxGeometry x="1240" y="740" width="120" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="pq0AM1h1IiiyBDEnBlEK-39" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0.75;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="pq0AM1h1IiiyBDEnBlEK-37" target="pq0AM1h1IiiyBDEnBlEK-32">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="pq0AM1h1IiiyBDEnBlEK-37" value="OscarNomGPT" style="rounded=0;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+          <mxGeometry x="1650" y="970" width="120" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="pq0AM1h1IiiyBDEnBlEK-40" value="Uses RandomSampler for training and validation dataset to reduce runtime/epoch" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;verticalAlign=top;align=left;spacingLeft=6;spacingRight=6;" vertex="1" parent="1">
+          <mxGeometry x="1820" y="1080" width="200" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="pq0AM1h1IiiyBDEnBlEK-41" value="TODOs:&lt;div&gt;- all models should have a config JSON file (yaml or w/e later...)&lt;/div&gt;&lt;div&gt;- config file should include model hyperparameters AND training parameters&lt;/div&gt;&lt;div&gt;&lt;br&gt;&lt;div&gt;train.py&lt;/div&gt;&lt;div&gt;- takes any model class and config&lt;/div&gt;&lt;div&gt;- default is uses all training and validation samples but does random sampling if the config&lt;/div&gt;&lt;/div&gt;&lt;div&gt;- unit_train.py no longer needed if the config file now specifies one epoch&lt;/div&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;verticalAlign=top;align=left;spacingLeft=6;spacingRight=6;" vertex="1" parent="1">
+          <mxGeometry x="2080" y="160" width="200" height="240" as="geometry" />
+        </mxCell>
+        <mxCell id="pq0AM1h1IiiyBDEnBlEK-44" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0.25;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="pq0AM1h1IiiyBDEnBlEK-43" target="pq0AM1h1IiiyBDEnBlEK-32">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="pq0AM1h1IiiyBDEnBlEK-43" value="gpt_download.py" style="rounded=0;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+          <mxGeometry x="1470" y="980" width="120" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="pq0AM1h1IiiyBDEnBlEK-45" value="Loads the pre-trained GPT-2 weights here" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;verticalAlign=top;align=left;spacingLeft=6;spacingRight=6;" vertex="1" parent="1">
+          <mxGeometry x="2030" y="1080" width="200" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="pq0AM1h1IiiyBDEnBlEK-46" value="src/gpt2/124M/" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;fontColor=#333333;strokeColor=#666666;verticalAlign=top;" vertex="1" parent="1">
+          <mxGeometry x="1450" y="850" width="160" height="100" as="geometry" />
+        </mxCell>
+        <mxCell id="pq0AM1h1IiiyBDEnBlEK-48" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="pq0AM1h1IiiyBDEnBlEK-47" target="pq0AM1h1IiiyBDEnBlEK-43">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="pq0AM1h1IiiyBDEnBlEK-47" value="hparams.json" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f5f5f5;fontColor=#333333;strokeColor=#666666;" vertex="1" parent="1">
+          <mxGeometry x="1470" y="880" width="120" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="pq0AM1h1IiiyBDEnBlEK-49" value="gpt_load.py" style="rounded=0;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+          <mxGeometry x="1080" y="1080" width="120" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="pq0AM1h1IiiyBDEnBlEK-50" value="seems like this is the same code already in gpt_download.py and no other code files use it...archive!" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;verticalAlign=top;align=left;spacingLeft=6;spacingRight=6;" vertex="1" parent="1">
+          <mxGeometry x="1080" y="1160" width="200" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="pq0AM1h1IiiyBDEnBlEK-51" value="model architectures and other class definitions can be imported rather than copy pasted..." style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;verticalAlign=top;align=left;spacingLeft=6;spacingRight=6;" vertex="1" parent="1">
+          <mxGeometry x="1620" y="1400" width="200" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="pq0AM1h1IiiyBDEnBlEK-53" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="pq0AM1h1IiiyBDEnBlEK-52" target="pq0AM1h1IiiyBDEnBlEK-43">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="pq0AM1h1IiiyBDEnBlEK-52" value="Downloads the weights/parameters from OpenAI&lt;div&gt;&lt;br&gt;&lt;/div&gt;&lt;div&gt;load weights function uses TensorFlow&lt;/div&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;verticalAlign=top;align=left;spacingLeft=6;spacingRight=6;" vertex="1" parent="1">
+          <mxGeometry x="1190" y="965" width="200" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="pq0AM1h1IiiyBDEnBlEK-54" value="TODOs:&lt;div&gt;- somehow the GPT-2 with pretrained weights should just go through all training samples and generate a sequence of embedding vectors for all screenplays&lt;/div&gt;&lt;div&gt;- the &quot;GPT version&quot; (&quot;chunky GPT&quot;) of the model takes an unfrozen trainable Transformer Decoder and learns to predict probability of nomination based on those pre-computed sequence of embedding vectors&lt;/div&gt;&lt;div&gt;- embedding vectors will be generated in a manner similar to the Movie-o-Label&lt;/div&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;verticalAlign=top;align=left;spacingLeft=6;spacingRight=6;" vertex="1" parent="1">
+          <mxGeometry x="2320" y="160" width="200" height="280" as="geometry" />
+        </mxCell>
+        <mxCell id="pq0AM1h1IiiyBDEnBlEK-55" value="TODOs:&lt;div&gt;- consider pre-chunking the screenplays like Movie-o-Label paper: 400 word chunks (avg eq tokens) with 80 word overlap&lt;/div&gt;&lt;div&gt;- all screenplays padded to end up with the same number of chunks&lt;/div&gt;&lt;div&gt;- each chunk is then given to hierarchical transformer encoder, which produces a sequence of embedding vectors, one by one...&lt;/div&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;verticalAlign=top;align=left;spacingLeft=6;spacingRight=6;" vertex="1" parent="1">
+          <mxGeometry x="1840" y="160" width="200" height="200" as="geometry" />
+        </mxCell>
+        <mxCell id="pq0AM1h1IiiyBDEnBlEK-56" value="gpt_temp.py" style="rounded=0;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+          <mxGeometry x="1080" y="1280" width="120" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="pq0AM1h1IiiyBDEnBlEK-57" value="seems like some attempt to test out a micro_batch_size...not sure why can&#39;t remember" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;verticalAlign=top;align=left;spacingLeft=6;spacingRight=6;" vertex="1" parent="1">
+          <mxGeometry x="1080" y="1360" width="200" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="pq0AM1h1IiiyBDEnBlEK-58" value="unit_train.py" style="rounded=0;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+          <mxGeometry x="1440" y="1160" width="120" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="pq0AM1h1IiiyBDEnBlEK-59" value="unit_train_gpt.py" style="rounded=0;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+          <mxGeometry x="1440" y="1240" width="120" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="pq0AM1h1IiiyBDEnBlEK-60" value="pulls from the actual dataset and runs 1 training epoch, rather than a random tensor of the same shape" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;verticalAlign=top;align=left;spacingLeft=6;spacingRight=6;" vertex="1" parent="1">
+          <mxGeometry x="1570" y="1190" width="200" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="pq0AM1h1IiiyBDEnBlEK-63" value="No longer needed if the config.json file specifies 1 epoch only for new train.py" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;verticalAlign=top;align=left;spacingLeft=6;spacingRight=6;" vertex="1" parent="1">
+          <mxGeometry x="1780" y="1190" width="200" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="pq0AM1h1IiiyBDEnBlEK-64" value="01_data_exp...&lt;div&gt;03_test_...&lt;/div&gt;&lt;div&gt;&lt;br&gt;&lt;/div&gt;&lt;div&gt;What&#39;s 02?&lt;/div&gt;&lt;div&gt;&lt;br&gt;&lt;/div&gt;&lt;div&gt;Word distributions?&lt;/div&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;verticalAlign=top;align=left;spacingLeft=6;spacingRight=6;" vertex="1" parent="1">
+          <mxGeometry x="840" y="1000" width="130" height="110" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
