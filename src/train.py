@@ -93,7 +93,7 @@ def main():
     total_params = sum(p.numel() for p in model.parameters())
     trainable_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
     frozen_params = total_params - trainable_params
-    print(f"Total model parameters: {total_params:,}")
+    print(f"\nTotal model parameters: {total_params:,}")
     print(f"Trainable model parameters: {trainable_params:,}")
     print(f"Frozen model parameters: {frozen_params:,}")
 
@@ -158,6 +158,7 @@ def main():
     best_val_loss = float('inf')
     best_path = models_dir / f'{checkpoint_prefix}_best.pth'
 
+    print(f"\nStarting training for {num_epochs} epochs...")
     training_start_time = time.time()
     epoch_times = []
 
@@ -247,6 +248,10 @@ def main():
     history_file = results_dir / history_filename
     with open(history_file, 'w') as f:
         json.dump(history, f, indent=2)
+
+    print("\nTraining complete!")
+
+    # TODO: save terminal outputs to a log file in the results folder
 
 if __name__ == '__main__':
     main()
