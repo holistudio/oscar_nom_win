@@ -247,3 +247,6 @@ def main():
     history_file = results_dir / history_filename
     with open(history_file, 'w') as f:
         json.dump(history, f, indent=2)
+
+if __name__ == '__main__':
+    main()
