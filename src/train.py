@@ -4,6 +4,7 @@ import pickle
 import importlib
 
 import torch
+import torch.nn as nn
 from torch.utils.data import DataLoader, RandomSampler
 
 from datasets import OscarScriptDataset
@@ -93,5 +94,20 @@ def main():
     print(f"Total model parameters: {total_params:,}")
     print(f"Trainable model parameters: {trainable_params:,}")
     print(f"Frozen model parameters: {frozen_params:,}")
-    
+
+    # loss criterion
+    class_weights = torch.tensor(training_cfg.get('class_weights', [1.0, 1.0]), 
+                                 dtype=torch.float).to(device)
+    criterion = nn.CrossEntropyLoss(
+        weight=class_weights,
+        label_smoothing=training_cfg.get('label_smoothing', 0.0)
+    )
+
+    # optimizer 
+    optimizer = torch.optim.AdamW(
+        model.parameters(),
+        lr=training_cfg.get('peak_lr', 3e-4),
+        weight_decay=training_cfg.get('weight_decay', 0.1)
+    )
+
     # TODO: load latest model weights and training/optimizer steps
