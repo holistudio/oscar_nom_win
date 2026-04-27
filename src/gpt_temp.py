@@ -179,23 +179,18 @@ class OscarNomGPT(nn.Module):
         
         # GPT-based encoder
         self.chunk_size = config["context_length"]
-        self.enc_d_model = config["emb_dim"]
+        self.enc_d_model = config["enc_d_model"]
+        self.micro_batch_size = config.get("micro_batch_size", 4)
 
         self.encoder = GPTModel(config)
 
-        self.chunk_head = nn.Linear(config["emb_dim"], config["enc_d_model"])
+        # Freeze the encoder — we only train the classification head
+        for param in self.encoder.parameters():
+            param.requires_grad = False
 
-        self.dropout= nn.Dropout(config['drop_rate'])
+        self.dropout = nn.Dropout(config['drop_rate'])
 
         self.classification_head = nn.Linear(config["enc_d_model"], 2)
-    
-    def _positional_encoder(self, max_seq_len, d_model):
-        position = torch.arange(max_seq_len).unsqueeze(1)
-        div_term = torch.exp(torch.arange(0, d_model, 2) * -(math.log(10000.0) / d_model))
-        pe = torch.zeros(max_seq_len, d_model)
-        pe[:, 0::2] = torch.sin(position * div_term)
-        pe[:, 1::2] = torch.cos(position * div_term)
-        return pe.unsqueeze(0)
     
     def forward(self, src):
         batch_size, seq_len = src.shape
@@ -203,32 +198,57 @@ class OscarNomGPT(nn.Module):
         # 1. Chunk the input
         # Pad seq_len to be divisible by chunk_size
         remainder = seq_len % self.chunk_size
-        if remainder != 0 :
+        if remainder != 0:
             pad_len = self.chunk_size - remainder
             src = F.pad(src, (0, pad_len), value=0)
             seq_len = src.shape[1]
 
         num_chunks = seq_len // self.chunk_size
 
-        # Then reshape to (batch_size * num_chunks, chunk_size)
-        src = src.view((batch_size, num_chunks, self.chunk_size))
-        src = src.view((batch_size * num_chunks, self.chunk_size))
+        # Reshape to (batch_size, num_chunks, chunk_size)
+        src = src.view(batch_size, num_chunks, self.chunk_size)
 
-        # 2. GPT-2 encodes the input into embedings
-        # Shape after encoder: (batch_size * num_chunks, chunk_size, enc_d_model)
-        enc_chunks = self.encoder(src)
+        # 2. Encode chunks in micro-batches under no_grad (encoder is frozen)
+        #    This is the critical fix: no_grad tells PyTorch not to store
+        #    activations for backprop, so memory from each micro-batch is
+        #    freed before the next one starts.
+        all_chunk_embs = []
 
-        # 3. Pool each chunk to single vector (mean pool over token dimension)
-        # Shape: (batch_size * num_chunks, enc_d_model)
-        chunk_embs = enc_chunks.mean(dim=1)
+        with torch.no_grad():
+            for b_idx in range(batch_size):
+                chunks_for_sample = src[b_idx]  # (num_chunks, chunk_size)
 
-        # 4. Reshape back to (batch_size, num_chunks, enc_d_model)
-        chunk_embs = chunk_embs.view((batch_size, num_chunks, self.enc_d_model))
+                sample_chunk_embs = []
+                for i in range(0, num_chunks, self.micro_batch_size):
+                    micro_batch = chunks_for_sample[i : i + self.micro_batch_size]  # (mb_size, chunk_size)
 
-        # 5. Project if needed and pool to single vector (mean pool over chunk dimension)
+                    # GPT-2 encodes the micro-batch
+                    # Shape: (mb_size, chunk_size, enc_d_model)
+                    enc_out = self.encoder(micro_batch)
+
+                    # Mean pool each chunk over the token dimension
+                    # Shape: (mb_size, enc_d_model)
+                    pooled = enc_out.mean(dim=1)
+
+                    sample_chunk_embs.append(pooled)
+
+                # Stack all chunk embeddings for this sample
+                # Shape: (num_chunks, enc_d_model)
+                sample_chunk_embs = torch.cat(sample_chunk_embs, dim=0)
+                all_chunk_embs.append(sample_chunk_embs)
+
+        # Shape: (batch_size, num_chunks, enc_d_model)
+        # .detach() is redundant with no_grad but makes the intent explicit:
+        # the classification head is the only thing that gets gradients
+        chunk_embs = torch.stack(all_chunk_embs, dim=0).detach()
+
+        # 3. Aggregate across chunks (mean pool over chunk dimension)
+        # Shape: (batch_size, enc_d_model)
         agg_out = chunk_embs.mean(dim=1)
 
-        # 6. Classification head
+        agg_out = self.dropout(agg_out)
+
+        # 4. Classification head
         # Shape: (batch_size, 2)
         logits = self.classification_head(agg_out)
 
@@ -247,6 +267,7 @@ if __name__ == '__main__':
         'n_layers': 12,
 
         'max_seq_len': 106578,
+        'micro_batch_size': 4,
 
         "drop_rate": 0.1,
         "qkv_bias": True
@@ -259,7 +280,9 @@ if __name__ == '__main__':
 
     src = torch.randint(0, config['vocab_size'], (batch_size, src_seq_len)).to(device)
 
-    print(f"Model parameters: {sum(p.numel() for p in model.parameters()):,}")
+    trainable = sum(p.numel() for p in model.parameters() if p.requires_grad)
+    total = sum(p.numel() for p in model.parameters())
+    print(f"Model parameters: {total:,} total, {trainable:,} trainable")
     print(f"Source shape: {src.shape}")
     print("Running forward pass...")
     logits = model(src)
