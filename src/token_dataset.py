@@ -28,6 +28,7 @@ for dataset_name, df in datasets.items():
     items = []
     for idx, row in df.iterrows():
         item = {
+            'imdb_id': str(row['imdb_id']),
             'input_ids': tokenizer.encode(row['script_clean']),
             'target': int(row['nominated'])
         }
