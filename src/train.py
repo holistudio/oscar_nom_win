@@ -64,6 +64,17 @@ def main():
     model_cfg = cfg['model']
     training_cfg = cfg['training']
 
+    # save to a subdirectory specified in config
+    models_dir = Path(training_cfg.get('models_dir', '../models')) / training_cfg['sub_dir']
+    results_dir = Path(training_cfg.get('results_dir', '../results')) / training_cfg['sub_dir']
+    models_dir.mkdir(exist_ok=True, parents=True)
+    results_dir.mkdir(exist_ok=True, parents=True)
+
+    # save to prefix_config.json model folder
+    save_config_file = models_dir / f"{training_cfg['checkpoint_prefix']}_config.json"
+    with open(save_config_file, 'w') as f:
+        json.dump(cfg, f, indent=2)
+
     # seeds for reproducibility
     seed = training_cfg.get('seed', 1337)
     torch.manual_seed(seed)
@@ -73,6 +84,7 @@ def main():
 
     # CUDA device
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
+    print(f'Device: {device}\n')
 
     # load data
     with open(data_cfg['train_path'], 'rb') as f:
@@ -146,15 +158,9 @@ def main():
 
     # save model and results to appropriate directories
     checkpoint_prefix = training_cfg.get('checkpoint_prefix', 'model')
-    
-    # save to a subdirectory specified in config
-    models_dir = Path(training_cfg.get('models_dir', '../models')) / training_cfg['sub_dir']
-    results_dir = Path(training_cfg.get('results_dir', '../results')) / training_cfg['sub_dir']
-    models_dir.mkdir(exist_ok=True, parents=True)
-    results_dir.mkdir(exist_ok=True, parents=True)
 
     # training loop logging
-    history = {'train_loss': [], 'val_loss':[]}
+    history = {'train_loss': [], 'val_loss':[], 'train_acc':[], 'val_acc':[]}
     best_val_loss = float('inf')
     best_path = models_dir / f'{checkpoint_prefix}_best.pth'
 
@@ -169,6 +175,8 @@ def main():
         # training step
         model.train()
         train_losses = []
+        train_correct = 0
+        train_total = 0
         for batch in train_dataloader:
             input_ids = batch['input_ids'].to(device)
             targets = batch['target'].to(device)
@@ -183,12 +191,19 @@ def main():
             optimizer.step()
             scheduler.step()
 
+            preds = torch.argmax(logits, dim=-1)
+            train_correct += (preds == targets).sum().item()
+            train_total += preds.shape[0]
+
             train_losses.append(loss.item())
         avg_train_loss = sum(train_losses) / len(train_losses)
+        avg_train_acc = train_correct / train_total
 
         # validation step
         model.eval()
         val_losses = []
+        val_correct = 0
+        val_total = 0
         for batch in val_dataloader:
             input_ids = batch['input_ids'].to(device)
             targets = batch['target'].to(device)
@@ -196,8 +211,13 @@ def main():
             logits = model(input_ids)
             loss = criterion(logits, targets)
             
+            preds = torch.argmax(logits, dim=-1)
+            val_correct += (preds == targets).sum().item()
+            val_total += preds.shape[0]
+
             val_losses.append(loss.item())
         avg_val_loss = sum(val_losses) / len(val_losses)
+        avg_val_acc = val_correct / val_total
 
         # log and checkpoint
         epoch_time = time.time() - epoch_start_time
@@ -209,6 +229,8 @@ def main():
 
         history['train_loss'].append(avg_train_loss)
         history['val_loss'].append(avg_val_loss)
+        history['train_acc'].append(avg_train_acc)
+        history['val_acc'].append(avg_val_acc)
 
         if avg_val_loss < best_val_loss:
             best_val_loss = avg_val_loss
@@ -236,15 +258,19 @@ def main():
                 'config': cfg
             }, best_path)
             print(f"Epoch [{epoch+1}/{num_epochs}] - Train Loss: {avg_train_loss:.4f}, "
-                  f"Val Loss: {avg_val_loss:.4f} - Elapsed: {elapsed_str}, "
+                  f"Val Loss: {avg_val_loss:.4f}, "
+                  f"Train Acc: {avg_train_acc*100:.1f}%, "
+                  f"Val Acc: {avg_val_acc*100:.1f}% - Elapsed: {elapsed_str}, "
                   f"Avg/Epoch: {avg_time_str} - New best! Model saved.")
         else:
             print(f"Epoch [{epoch+1}/{num_epochs}] - Train Loss: {avg_train_loss:.4f}, "
-                  f"Val Loss: {avg_val_loss:.4f} - Elapsed: {elapsed_str}, "
+                  f"Val Loss: {avg_val_loss:.4f}, "
+                  f"Train Acc: {avg_train_acc*100:.1f}%, "
+                  f"Val Acc: {avg_val_acc*100:.1f}% - Elapsed: {elapsed_str}, "
                   f"Avg/Epoch: {avg_time_str}")
     
     # save training history
-    history_filename = training_cfg.get('history_filename', 'training_history.json')
+    history_filename = f"{checkpoint_prefix}_{training_cfg.get('history_filename', 'training_history.json')}"
     history_file = results_dir / history_filename
     with open(history_file, 'w') as f:
         json.dump(history, f, indent=2)
