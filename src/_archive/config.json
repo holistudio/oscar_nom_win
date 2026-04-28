@@ -1,0 +1,48 @@
+{
+  "model": {
+    "module": "transformer",
+    "class_name": "OscarNomTransformer",
+    "params": {
+      "chunk_size": 1024,
+      "vocab_size": 50257,
+
+      "enc_d_model": 192,
+      "enc_nhead": 6,
+      "enc_dim_ff": 384,
+      "enc_num_layers": 3,
+
+      "agg_d_model": 128,
+      "agg_nhead": 4,
+      "agg_dim_ff": 256,
+      "agg_num_layers": 1,
+
+      "max_seq_len": 106578,
+      "dropout": 0.35
+    }
+  },
+
+  "training": {
+    "epochs": 1,
+    "batch_size": 2,
+    "peak_lr": 8e-5,
+    "weight_decay": 0.08,
+    "eta_min": 1e-6,
+    "warmup_fraction": 0.1,
+    "grad_clip": 1.0,
+    "class_weights": [1.0, 4.0],
+    "label_smoothing": 0.1,
+    "seed": 1337,
+    "checkpoint_prefix": "transformer",
+    "models_dir": "../models",
+    "results_dir": "../results",
+    "sub_dir": "260427_test",
+    "history_filename": "training_history.json"
+  },
+
+  "data": {
+    "train_path": "./token_data/train_tokenized.pkl",
+    "val_path": "./token_data/val_tokenized.pkl",
+    "test_path": "./token_data/test_tokenized.pkl",
+    "subsample": null
+  }
+}
