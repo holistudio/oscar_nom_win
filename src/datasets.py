@@ -8,7 +8,7 @@ class OscarScriptDataset(Dataset):
 
     def __init__(self, tokenized_items, max_length=5000):
         self.max_length = max_length
-        print(f"Processing {len(tokenized_items)} pre-tokenized screenplays into Datasets...")
+        print(f"\nProcessing {len(tokenized_items)} pre-tokenized screenplays into Datasets...")
         self.inputs = []
         self.targets = []
 
@@ -21,8 +21,8 @@ class OscarScriptDataset(Dataset):
             self.inputs.append(torch.tensor(tokens, dtype=torch.long))
             self.targets.append(torch.tensor(item['target'], dtype=torch.long))
 
-            if (idx + 1) % 100 == 0:
-                print(f"  Processed {idx + 1}/{len(tokenized_items)} screenplays")
+            # if (idx + 1) % 100 == 0:
+            #     print(f"  Processed {idx + 1}/{len(tokenized_items)} screenplays")
 
         print("Processing Datasets complete!")
 
