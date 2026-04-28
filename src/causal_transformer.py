@@ -192,6 +192,7 @@ class OscarNomTransformer(nn.Module):
 if __name__ == '__main__':
     torch.manual_seed(1337)
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
+    print(f"Device: {device}\n")
 
     config = {
         'chunk_size': 1024,
