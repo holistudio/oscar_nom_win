@@ -171,3 +171,57 @@ class GPTModel(nn.Module):
         x = self.final_norm(x)
         logits = self.out_head(x)
         return logits
+    
+"""
+alternative GPTModel using torch.nn modules
+"""
+
+class GPTModel(nn.Module):
+    def __init__(self, cfg):
+        super().__init__()
+        
+        self.context_length = cfg['context_length']
+
+        self.tok_emb = nn.Embedding(cfg['vocab_size'], cfg['emb_dim'])
+        self.pos_emb = nn.Embedding(cfg['context_length'], cfg['emb_dim'])
+        self.drop_emb = nn.Dropout(cfg['drop_rate'])
+
+        trf_block = nn.TransformerEncoderLayer(
+            d_model=cfg['emb_dim'],
+            nhead=cfg['n_heads'],
+            dim_feedforward=4 * cfg['emb_dim'],
+            dropout=cfg['drop_rate'],
+            activation='gelu',
+            batch_first=True,
+            norm_first=True, # LayerNorm before FeedForward
+            bias=cfg['qkv_bias']
+        )
+
+        self.trf_blocks = nn.TransformerEncoder(
+            trf_block,
+            num_layers=cfg['n_layers'],
+            norm=nn.LayerNorm(cfg['emb_dim']) # Final LayerNorm after all transformer blocks
+        )
+
+        self.out_head = nn.Linear(cfg['emb_dim'], cfg['vocab_size'], bias=False)
+
+        causal_mask = torch.triu(
+            torch.ones(cfg['context_length'], cfg['context_length'], dtype=torch.bool),
+            diagonal=1
+        )
+        self.register_buffer('causal_mask', causal_mask, persistent=False)
+    
+    def forward(self, in_idx):
+        batch_size, seq_len = in_idx.shape
+        tok_embeds = self.tok_emb(in_idx)
+        pos_embeds = self.pos_emb(
+            torch.arange(seq_len, device=in_idx.device)
+        )
+        x = tok_embeds + pos_embeds
+        x = self.drop_emb(x)
+
+        mask = self.causal_mask[:seq_len, :seq_len]
+        x = self.trf_blocks(x, mask=mask, is_causal=True)
+
+        logits = self.out_head(x)
+        return logits
