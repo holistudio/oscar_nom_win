@@ -29,7 +29,7 @@ class OscarNomTransformer(nn.Module):
         encoder_layer = nn.TransformerEncoderLayer(
             d_model=config['enc_d_model'],
             nhead=config['enc_nhead'],
-            dim_feedforward=config['enc_dim_ff'],
+            dim_feedforward=config['enc_dim_ff'], # TODO: archive this version but then replace with config['enc_d_model'] * 4
             dropout=config['dropout'],
             batch_first=True
         )
