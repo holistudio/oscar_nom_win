@@ -1,3 +1,5 @@
+import math
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -91,7 +93,53 @@ class OscarNomTransformer(nn.Module):
         self.register_buffer('agg_causal_mask', agg_causal_mask, persistent=False)
 
         self.classification_head = nn.Linear(cfg['agg_d_model'], 2)
+
+        # Initialize weights following GPT best practices
+        self.apply(self._init_weights)
+
+        # Apply special scaled initialization for residual projections
+        self.enc_num_layers = cfg['enc_num_layers']
+        self.agg_num_layers = cfg['agg_num_layers']
+        self._init_residual_projections()
     
+    def _init_weights(self, module):
+        """
+        Initialize weights following GPT best practices.
+        - Embeddings: N(0, 0.02)
+        - Linear layers: N(0, 0.02) for weights, 0 for biases
+        - LayerNorm: standard initialization (weight=1, bias=0)
+        """
+        if isinstance(module, nn.Linear):
+            torch.nn.init.normal_(module.weight, mean=0.0, std=0.02)
+            if module.bias is not None:
+                torch.nn.init.zeros_(module.bias)
+        elif isinstance(module, nn.Embedding):
+            torch.nn.init.normal_(module.weight, mean=0.0, std=0.02)
+        elif isinstance(module, nn.LayerNorm):
+            torch.nn.init.ones_(module.weight)
+            torch.nn.init.zeros_(module.bias)
+
+    def _init_residual_projections(self):
+        """
+        Apply scaled initialization to residual projection layers.
+        Following GPT-2, scale by 1/sqrt(2*num_layers) for stability in deep networks.
+        """
+        total_layers = self.enc_num_layers + self.agg_num_layers
+
+        # Scale residual projections in encoder layers
+        for layer in self.enc_trf_blocks.layers:
+            # Scale the second linear layer in the feedforward network (residual projection)
+            torch.nn.init.normal_(layer.linear2.weight, mean=0.0, std=0.02/math.sqrt(2 * total_layers))
+            # Scale the output projection in multi-head attention
+            torch.nn.init.normal_(layer.self_attn.out_proj.weight, mean=0.0, std=0.02/math.sqrt(2 * total_layers))
+
+        # Scale residual projections in aggregator layers
+        for layer in self.agg_trf_blocks.layers:
+            # Scale the second linear layer in the feedforward network (residual projection)
+            torch.nn.init.normal_(layer.linear2.weight, mean=0.0, std=0.02/math.sqrt(2 * total_layers))
+            # Scale the output projection in multi-head attention
+            torch.nn.init.normal_(layer.self_attn.out_proj.weight, mean=0.0, std=0.02/math.sqrt(2 * total_layers))
+
     def forward(self, src):
         batch_size, seq_len = src.shape
 
