@@ -49,13 +49,74 @@ def build_model(model_cfg, device):
     model = ModelClass(model_cfg['params']).to(device)
     return model
 
+def resolve_resume_path(args, models_dir, checkpoint_prefix):
+    """Figure out which checkpoint to resume from, if any.
+
+    Three cases:
+      - --resume not passed                  -> None (fresh run)
+      - --resume with no path                -> auto-find {prefix}_latest.pth
+      - --resume /path/to/checkpoint.pth     -> use that
+    """
+    if not args.resume_requested:
+        return None
+    if args.resume_path is not None:
+        p = Path(args.resume_path)
+        if not p.exists():
+            raise FileNotFoundError(f"--resume path does not exist: {p}")
+        return p
+    auto = models_dir / f'{checkpoint_prefix}_latest.pth'
+    if not auto.exists():
+        raise FileNotFoundError(
+            f"--resume passed but no checkpoint found at {auto}. "
+            f"Either pass an explicit path or start fresh without --resume."
+        )
+    return auto
+
+
+def warn_on_config_drift(saved_cfg, current_cfg, logger):
+    """Log a warning if the resumed config disagrees with the saved one in
+    ways that would silently change training semantics."""
+    fields_to_check = [
+        ('training', 'epochs'),
+        ('training', 'batch_size'),
+        ('training', 'peak_lr'),
+        ('training', 'eta_min'),
+        ('training', 'warmup_fraction'),
+        ('training', 'class_weights'),
+        ('training', 'label_smoothing'),
+        ('training', 'weight_decay'),
+        ('model', 'params'),
+    ]
+    drift = []
+    for section, key in fields_to_check:
+        old = saved_cfg.get(section, {}).get(key)
+        new = current_cfg.get(section, {}).get(key)
+        if old != new:
+            drift.append(f"  {section}.{key}: saved={old!r}  current={new!r}")
+    if drift:
+        logger.warning(
+            "Config differs from saved checkpoint config:\n" + "\n".join(drift) +
+            "\nProceeding anyway — make sure this is what you want."
+        )
+
+
 def main():
     # argument parsing
     parser = argparse.ArgumentParser(description='Oscar nomination prediction model trainer')
 
     parser.add_argument('--config', type=str, required=True,
                         help='Path to JSON config file')
+    parser.add_argument('--resume', dest='resume_path', nargs='?',
+                        const='__AUTO__', default=None,
+                        help="Resume training. Default auto-loads "
+                             "{models_dir}/{sub_dir}/{prefix}_latest.pth. "
+                             "Or pass an explicit checkpoint path.")
     args = parser.parse_args()
+
+    # did the user pass --resume at all?
+    args.resume_requested = args.resume_path is not None
+    if args.resume_path == '__AUTO__':
+        args.resume_path = None  # signal: auto-discover
 
     # load config
     with open(args.config, 'r') as f:
@@ -84,10 +145,15 @@ def main():
     logger.addHandler(file_handler)
     logger.addHandler(console_handler)
 
-    # save to prefix_config.json model folder
-    save_config_file = models_dir / f"{training_cfg['checkpoint_prefix']}_config.json"
-    with open(save_config_file, 'w') as f:
-        json.dump(cfg, f, indent=2)
+    # resolve resume target
+    checkpoint_prefix = training_cfg.get('checkpoint_prefix', 'model')
+    resume_path = resolve_resume_path(args, models_dir, checkpoint_prefix)
+
+    # save prefix_config.json only on a fresh run
+    if resume_path is None:
+        save_config_file = models_dir / f"{checkpoint_prefix}_config.json"
+        with open(save_config_file, 'w') as f:
+            json.dump(cfg, f, indent=2)
 
     # seeds for reproducibility
     seed = training_cfg.get('seed', 1337)
@@ -165,25 +231,65 @@ def main():
         milestones=[warmup_steps],
     )
 
-    # TODO: load latest model weights and training/optimizer steps/learning rate schedule
-
     # gradient clipping
     grad_clip = training_cfg.get('grad_clip', 1.0)
 
-    # save model and results to appropriate directories
-    checkpoint_prefix = training_cfg.get('checkpoint_prefix', 'model')
-
     # training loop logging
-    history = {'train_loss': [], 'val_loss':[], 'train_acc':[], 'val_acc':[]}
+    history = {'train_loss': [], 'val_loss': [], 'train_acc': [], 'val_acc': []}
     best_val_loss = float('inf')
-    best_path = models_dir / f'{checkpoint_prefix}_best.pth'
+    start_epoch = 0  # assume for fresh run
 
-    logger.info(f"\nStarting training for {num_epochs} epochs...")
+    # resume training from checkpoint if --resume specified
+    if resume_path is not None:
+        logger.info(f"\n>>> RESUMING from checkpoint: {resume_path}")
+        ckpt = torch.load(resume_path, map_location=device)
+
+        # config drift check
+        if 'config' in ckpt:
+            warn_on_config_drift(ckpt['config'], cfg, logger)
+
+        model.load_state_dict(ckpt['model_state_dict'])
+        optimizer.load_state_dict(ckpt['optimizer_state_dict'])
+        scheduler.load_state_dict(ckpt['scheduler_state_dict'])
+
+        # 'epoch' should be 0-indexed start of the next epoch
+        start_epoch = ckpt['epoch']
+        history = ckpt.get('history', history)
+        best_val_loss = ckpt.get('best_val_loss', float('inf'))
+
+        # sanity: the scheduler's internal step count should equal
+        # start_epoch * len(train_dataloader)
+        expected_steps = start_epoch * len(train_dataloader)
+        actual_steps = scheduler.last_epoch
+        if actual_steps != expected_steps:
+            logger.warning(
+                f"Scheduler step count ({actual_steps}) does not match "
+                f"start_epoch * steps_per_epoch ({expected_steps}). "
+                f"LR schedule may be slightly off."
+            )
+
+        if start_epoch >= num_epochs:
+            logger.info(
+                f"Saved epoch ({start_epoch}) >= configured epochs ({num_epochs}). "
+                f"Nothing to do. Increase 'epochs' in config to train further."
+            )
+            return
+
+        logger.info(
+            f">>> Resuming at epoch {start_epoch + 1}/{num_epochs}, "
+            f"best_val_loss so far = {best_val_loss:.4f}\n"
+        )
+    else:
+        logger.info(f"\nStarting fresh training for {num_epochs} epochs...")
+
+    best_path = models_dir / f'{checkpoint_prefix}_best.pth'
+    latest_path = models_dir / f'{checkpoint_prefix}_latest.pth'
+
     training_start_time = time.time()
     epoch_times = []
 
     # training + validation loop
-    for epoch in range(num_epochs):
+    for epoch in range(start_epoch, num_epochs):
         epoch_start_time = time.time()
         
         # training step
@@ -218,22 +324,23 @@ def main():
         val_losses = []
         val_correct = 0
         val_total = 0
-        for batch in val_dataloader:
-            input_ids = batch['input_ids'].to(device)
-            targets = batch['target'].to(device)
-            
-            logits = model(input_ids)
-            loss = criterion(logits, targets)
-            
-            preds = torch.argmax(logits, dim=-1)
-            val_correct += (preds == targets).sum().item()
-            val_total += preds.shape[0]
+        with torch.no_grad():
+            for batch in val_dataloader:
+                input_ids = batch['input_ids'].to(device)
+                targets = batch['target'].to(device)
 
-            val_losses.append(loss.item())
+                logits = model(input_ids)
+                loss = criterion(logits, targets)
+
+                preds = torch.argmax(logits, dim=-1)
+                val_correct += (preds == targets).sum().item()
+                val_total += preds.shape[0]
+
+                val_losses.append(loss.item())
         avg_val_loss = sum(val_losses) / len(val_losses)
         avg_val_acc = val_correct / val_total
 
-        # log and checkpoint
+        # log timing
         epoch_time = time.time() - epoch_start_time
         epoch_times.append(epoch_time)
         elapsed_time = time.time() - training_start_time
@@ -246,48 +353,44 @@ def main():
         history['train_acc'].append(avg_train_acc)
         history['val_acc'].append(avg_val_acc)
 
+        # build checkpoint payload once, reuse for latest and best models 
+        ckpt_payload = {
+            'epoch': epoch + 1, # 1-indexed: epoch that just finished
+            'model_state_dict': model.state_dict(),
+            'optimizer_state_dict': optimizer.state_dict(),
+            'scheduler_state_dict': scheduler.state_dict(),
+            'train_loss': avg_train_loss,
+            'val_loss': avg_val_loss,
+            'best_val_loss': best_val_loss,
+            'history': history,
+            'config': cfg,
+        }
+
+        # save latest checkpoint
+        torch.save(ckpt_payload, latest_path)
+
+        # save best checkpoint when val loss improves
         if avg_val_loss < best_val_loss:
             best_val_loss = avg_val_loss
 
-            # save checkpoint
-            checkpoint_path = models_dir / f'{checkpoint_prefix}_ep{epoch+1}.pth'
-            torch.save({
-                'epoch': epoch + 1,
-                'model_state_dict': model.state_dict(),
-                'optimizer_state_dict': optimizer.state_dict(),
-                'scheduler_state_dict': scheduler.state_dict(),
-                'train_loss': avg_train_loss,
-                'val_loss': avg_val_loss,
-                'config': cfg
-            }, checkpoint_path)
-
-            # save/overwrite "best_model" file
-            torch.save({
-                'epoch': epoch + 1,
-                'model_state_dict': model.state_dict(),
-                'optimizer_state_dict': optimizer.state_dict(),
-                'scheduler_state_dict': scheduler.state_dict(),
-                'train_loss': avg_train_loss,
-                'val_loss': avg_val_loss,
-                'config': cfg
-            }, best_path)
-            logger.info(f"Epoch [{epoch+1}/{num_epochs}] - Train Loss: {avg_train_loss:.4f}, "
-                  f"Val Loss: {avg_val_loss:.4f}, "
-                  f"Train Acc: {avg_train_acc*100:.1f}%, "
-                  f"Val Acc: {avg_val_acc*100:.1f}% - Elapsed: {elapsed_str}, "
-                  f"Avg/Epoch: {avg_time_str} - New best! Model saved.")
+            torch.save(ckpt_payload, best_path)
+            tail = " - New best! Model saved."
         else:
-            logger.info(f"Epoch [{epoch+1}/{num_epochs}] - Train Loss: {avg_train_loss:.4f}, "
-                  f"Val Loss: {avg_val_loss:.4f}, "
-                  f"Train Acc: {avg_train_acc*100:.1f}%, "
-                  f"Val Acc: {avg_val_acc*100:.1f}% - Elapsed: {elapsed_str}, "
-                  f"Avg/Epoch: {avg_time_str}")
-    
-    # save training history
-    history_filename = f"{checkpoint_prefix}_{training_cfg.get('history_filename', 'training_history.json')}"
-    history_file = results_dir / history_filename
-    with open(history_file, 'w') as f:
-        json.dump(history, f, indent=2)
+            tail = ""
+
+        logger.info(
+            f"Epoch [{epoch+1}/{num_epochs}] - Train Loss: {avg_train_loss:.4f}, "
+            f"Val Loss: {avg_val_loss:.4f}, "
+            f"Train Acc: {avg_train_acc*100:.1f}%, "
+            f"Val Acc: {avg_val_acc*100:.1f}% - Elapsed: {elapsed_str}, "
+            f"Avg/Epoch: {avg_time_str}{tail}"
+        )
+
+        # save training history every epoch
+        history_filename = f"{checkpoint_prefix}_{training_cfg.get('history_filename', 'training_history.json')}"
+        history_file = results_dir / history_filename
+        with open(history_file, 'w') as f:
+            json.dump(history, f, indent=2)
 
     logger.info("\nTraining complete!")
 
