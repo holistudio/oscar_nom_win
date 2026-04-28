@@ -132,3 +132,34 @@ class OscarNomTransformer(nn.Module):
         logits = self.classification_head(x)
         return logits
 
+if __name__ == '__main__':
+    torch.manual_seed(1337)
+    device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
+
+    config = {
+        'chunk_size': 1024,
+        'vocab_size': 50257,
+        'enc_d_model': 256,
+        'enc_nhead': 8,
+        'enc_num_layers': 4,
+
+        'agg_d_model': 256,
+        'agg_nhead': 8,
+        'agg_num_layers': 4,
+
+        'max_seq_len': 106578,
+
+        'dropout': 0.1,
+    }
+
+    model = OscarNomTransformer(config).to(device)
+
+    batch_size = 2
+    src_seq_len = 106578
+    src = torch.randint(0, config['vocab_size'], (batch_size, src_seq_len)).to(device)
+
+    print(f"Model parameters: {sum(p.numel() for p in model.parameters()):,}")
+    print(f"Source shape: {src.shape}")
+    logits = model(src)
+    print(f"Output logits shape: {logits.shape}")
+    print(f"Logits:\n{logits}")
