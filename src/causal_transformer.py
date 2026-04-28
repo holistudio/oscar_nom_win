@@ -1,5 +1,6 @@
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 
 class LayerNorm(nn.Module):
     def __init__(self, emb_dim):
@@ -87,7 +88,13 @@ class OscarNomTransformer(nn.Module):
     def forward(self, src):
         batch_size, seq_len = src.shape
 
-        # TODO: padding with end-of-chunk CLS token
+        # padding if screenplay has extra tokens outside full chunk windows
+        # TODO:  with end-of-chunk CLS token
+        remainder = seq_len % self.chunk_size
+        if remainder != 0:
+            pad_len = self.chunk_size - remainder
+            src = F.pad(src, (0,pad_len), value=0)
+            seq_len = src.shape[1]
 
         num_chunks = seq_len // self.chunk_size
 
