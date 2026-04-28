@@ -27,10 +27,15 @@ class OscarNomTransformer(nn.Module):
         self.chunk_size = cfg['chunk_size']
 
         self.tok_emb = nn.Embedding(cfg['vocab_size'], cfg['enc_d_model'])
-        self.enc_pos_emb = nn.Embedding(cfg['chunk_size'], cfg['enc_d_model'])
-        self.enc_drop_emb = nn.Dropout(cfg['dropout'])
-        # TODO: end-of-chunk learnable token
 
+        # classification / CLS-like summary token at end of each chunk
+        self.enc_cls = nn.Parameter(torch.zeros(1,1, cfg['enc_d_model']))
+        nn.init.normal_(self.enc_cls, mean=0.0, std=0.02)
+        self.enc_seq_len = self.chunk_size + 1
+
+        self.enc_pos_emb = nn.Embedding(self.enc_seq_len, cfg['enc_d_model'])
+        self.enc_drop_emb = nn.Dropout(cfg['dropout'])
+        
         enc_trf_block = nn.TransformerEncoderLayer(
             d_model=cfg['enc_d_model'],
             nhead=cfg['enc_nhead'],
@@ -48,7 +53,7 @@ class OscarNomTransformer(nn.Module):
             norm=LayerNorm(cfg['enc_d_model'])
         )
         enc_causal_mask = torch.triu(
-            torch.ones(self.chunk_size, self.chunk_size, dtype=torch.bool), # TODO: needs to change after adding end-of-chunk CLS token
+            torch.ones(self.enc_seq_len, self.enc_seq_len, dtype=torch.bool), 
             diagonal=1
         )
         self.register_buffer('enc_causal_mask', enc_causal_mask, persistent=False)
@@ -91,7 +96,6 @@ class OscarNomTransformer(nn.Module):
         batch_size, seq_len = src.shape
 
         # padding if screenplay has extra tokens outside full chunk windows
-        # TODO:  with end-of-chunk CLS token
         remainder = seq_len % self.chunk_size
         if remainder != 0:
             pad_len = self.chunk_size - remainder
@@ -104,13 +108,18 @@ class OscarNomTransformer(nn.Module):
         src = src.view(batch_size*num_chunks, self.chunk_size)
 
         token_embeds = self.tok_emb(src)
+
+        # add CLS-like token at end of each chunk
+        cls = self.enc_cls.expand(src.shape[0], -1, -1)
+        x = torch.cat([token_embeds, cls], dim=1)
+        
         enc_pos_embeds = self.enc_pos_emb(
-            torch.arange(self.chunk_size, device=src.device)
+            torch.arange(self.enc_seq_len, device=src.device)
         )
-        x = token_embeds + enc_pos_embeds
+        x = x+enc_pos_embeds
         x = self.enc_drop_emb(x)
 
-        enc_mask = self.enc_causal_mask[:self.chunk_size, :self.chunk_size]
+        enc_mask = self.enc_causal_mask[:self.enc_seq_len, :self.enc_seq_len]
         x = self.enc_trf_blocks(x, mask=enc_mask, is_causal=True)
 
         x = x[:, -1, :]
