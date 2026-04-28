@@ -46,9 +46,17 @@ class OscarNomTransformer(nn.Module):
             num_layers=cfg['enc_num_layers'],
             norm=LayerNorm(cfg['enc_d_model'])
         )
-
+        enc_causal_mask = torch.triu(
+            torch.ones(self.chunk_size, self.chunk_size, dtype=torch.bool), # TODO: needs to change after adding end-of-chunk CLS token
+            diagonal=1
+        )
+        self.register_buffer('enc_causal_mask', enc_causal_mask, persistent=False)
+        
+        if cfg['enc_d_model'] != cfg['agg_d_model']:
+            self.agg_proj = nn.Linear(cfg['enc_d_model'], cfg['agg_d_model'])
+        else:
+            self.agg_proj = nn.Identity()
         self.max_chunks = cfg['max_seq_len'] // cfg['chunk_size'] + 1
-        self.agg_proj = nn.Linear(cfg['enc_d_model'], cfg['agg_d_model']) # TODO: use nn.Identity if enc and agg d_models are same
         self.agg_pos_emb = nn.Embedding(self.max_chunks, cfg['agg_d_model'])
         self.agg_drop_emb = nn.Dropout(cfg['dropout'])
 
@@ -68,20 +76,13 @@ class OscarNomTransformer(nn.Module):
             num_layers=cfg['agg_num_layers'],
             norm=LayerNorm(cfg['agg_d_model'])
         )
-
-        self.classification_head = nn.Linear(cfg['agg_d_model'], 2)
-
-        enc_causal_mask = torch.triu(
-            torch.ones(self.chunk_size, self.chunk_size, dtype=torch.bool), # TODO: needs to change after adding end-of-chunk CLS token
-            diagonal=1
-        )
         agg_causal_mask = torch.triu(
             torch.ones(self.max_chunks, self.max_chunks, dtype=torch.bool), 
             diagonal=1
         )
-
-        self.register_buffer('enc_causal_mask', enc_causal_mask, persistent=False)
         self.register_buffer('agg_causal_mask', agg_causal_mask, persistent=False)
+
+        self.classification_head = nn.Linear(cfg['agg_d_model'], 2)
     
     def forward(self, src):
         batch_size, seq_len = src.shape
