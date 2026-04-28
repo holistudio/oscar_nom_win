@@ -53,6 +53,8 @@ class OscarNomTransformer(nn.Module):
         )
         self.register_buffer('enc_causal_mask', enc_causal_mask, persistent=False)
         
+        self.enc_d_model = cfg['enc_d_model']
+        
         if cfg['enc_d_model'] != cfg['agg_d_model']:
             self.agg_proj = nn.Linear(cfg['enc_d_model'], cfg['agg_d_model'])
         else:
@@ -98,7 +100,8 @@ class OscarNomTransformer(nn.Module):
 
         num_chunks = seq_len // self.chunk_size
 
-        # TODO: reshape src for parallel processing
+        # reshape src so that each row is a chunk
+        src = src.view(batch_size*num_chunks, self.chunk_size)
 
         token_embeds = self.tok_emb(src)
         enc_pos_embeds = self.enc_pos_emb(
@@ -111,6 +114,8 @@ class OscarNomTransformer(nn.Module):
         x = self.enc_trf_blocks(x, mask=enc_mask, is_causal=True)
 
         x = x[:, -1, :]
+        # reshape back into batches of screenplays
+        x = x.view(batch_size, num_chunks, self.enc_d_model)
 
         x = self.agg_proj(x)
         agg_pos_embeds = self.agg_pos_emb(
