@@ -223,5 +223,11 @@ class GPTModel(nn.Module):
         mask = self.causal_mask[:seq_len, :seq_len]
         x = self.trf_blocks(x, mask=mask, is_causal=True)
 
-        logits = self.out_head(x)
-        return logits
+        logits = self.out_head(x) # shape(batch_size, seq_len, vocab_size)
+        return logits 
+    
+    # GPT-2 then looks at last vector of logits 
+    # (given causal mask, only care about 
+    # the last output vector in the sequence 
+    # that has access to info from previous elements)
+    # logits = logits[:, -1, :]
