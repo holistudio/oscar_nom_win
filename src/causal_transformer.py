@@ -105,7 +105,7 @@ class OscarNomTransformer(nn.Module):
 
         token_embeds = self.tok_emb(src)
         enc_pos_embeds = self.enc_pos_emb(
-            torch.arange(seq_len, device=src.device)
+            torch.arange(self.chunk_size, device=src.device)
         )
         x = token_embeds + enc_pos_embeds
         x = self.enc_drop_emb(x)
