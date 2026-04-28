@@ -1,5 +1,9 @@
+import logging
+
 import torch
 from torch.utils.data import Dataset
+
+logger = logging.getLogger(__name__)
 
 class OscarScriptDataset(Dataset):
     """Pre-tokenized movie screenplays paired with binary Oscar-nomination labels.
@@ -8,7 +12,7 @@ class OscarScriptDataset(Dataset):
 
     def __init__(self, tokenized_items, max_length=5000):
         self.max_length = max_length
-        print(f"\nProcessing {len(tokenized_items)} pre-tokenized screenplays into Datasets...")
+        logger.info(f"\nProcessing {len(tokenized_items)} pre-tokenized screenplays into Datasets...")
         self.inputs = []
         self.targets = []
 
@@ -22,9 +26,9 @@ class OscarScriptDataset(Dataset):
             self.targets.append(torch.tensor(item['target'], dtype=torch.long))
 
             # if (idx + 1) % 100 == 0:
-            #     print(f"  Processed {idx + 1}/{len(tokenized_items)} screenplays")
+            #     logger.info(f"  Processed {idx + 1}/{len(tokenized_items)} screenplays")
 
-        print("Processing Datasets complete!")
+        logger.info("Processing Datasets complete!")
 
     def __len__(self):
         return len(self.inputs)

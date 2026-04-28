@@ -4,6 +4,7 @@ import pickle
 import importlib
 from pathlib import Path
 import time
+import logging
 
 import torch
 import torch.nn as nn
@@ -70,6 +71,19 @@ def main():
     models_dir.mkdir(exist_ok=True, parents=True)
     results_dir.mkdir(exist_ok=True, parents=True)
 
+    # save terminal outputs to a log file in the results folder
+    logger = logging.getLogger()
+    logger.setLevel(logging.DEBUG)
+    file_handler = logging.FileHandler(results_dir / f"{training_cfg['checkpoint_prefix']}_training.log")
+    file_handler.setLevel(logging.DEBUG)
+    console_handler = logging.StreamHandler()
+    console_handler.setLevel(logging.INFO)
+    formatter = logging.Formatter('%(asctime)s • %(name)s: \n%(message)s', datefmt='%H:%M:%S')
+    file_handler.setFormatter(formatter)
+    console_handler.setFormatter(formatter)
+    logger.addHandler(file_handler)
+    logger.addHandler(console_handler)
+
     # save to prefix_config.json model folder
     save_config_file = models_dir / f"{training_cfg['checkpoint_prefix']}_config.json"
     with open(save_config_file, 'w') as f:
@@ -84,7 +98,7 @@ def main():
 
     # CUDA device
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
-    print(f'Device: {device}\n')
+    logger.info(f'Device: {device}\n')
 
     # load data
     with open(data_cfg['train_path'], 'rb') as f:
@@ -105,9 +119,9 @@ def main():
     total_params = sum(p.numel() for p in model.parameters())
     trainable_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
     frozen_params = total_params - trainable_params
-    print(f"\nTotal model parameters: {total_params:,}")
-    print(f"Trainable model parameters: {trainable_params:,}")
-    print(f"Frozen model parameters: {frozen_params:,}")
+    logger.info(f"\nTotal model parameters: {total_params:,}")
+    logger.info(f"Trainable model parameters: {trainable_params:,}")
+    logger.info(f"Frozen model parameters: {frozen_params:,}")
 
     # loss criterion
     class_weights = torch.tensor(training_cfg.get('class_weights', [1.0, 1.0]), 
@@ -164,7 +178,7 @@ def main():
     best_val_loss = float('inf')
     best_path = models_dir / f'{checkpoint_prefix}_best.pth'
 
-    print(f"\nStarting training for {num_epochs} epochs...")
+    logger.info(f"\nStarting training for {num_epochs} epochs...")
     training_start_time = time.time()
     epoch_times = []
 
@@ -257,13 +271,13 @@ def main():
                 'val_loss': avg_val_loss,
                 'config': cfg
             }, best_path)
-            print(f"Epoch [{epoch+1}/{num_epochs}] - Train Loss: {avg_train_loss:.4f}, "
+            logger.info(f"Epoch [{epoch+1}/{num_epochs}] - Train Loss: {avg_train_loss:.4f}, "
                   f"Val Loss: {avg_val_loss:.4f}, "
                   f"Train Acc: {avg_train_acc*100:.1f}%, "
                   f"Val Acc: {avg_val_acc*100:.1f}% - Elapsed: {elapsed_str}, "
                   f"Avg/Epoch: {avg_time_str} - New best! Model saved.")
         else:
-            print(f"Epoch [{epoch+1}/{num_epochs}] - Train Loss: {avg_train_loss:.4f}, "
+            logger.info(f"Epoch [{epoch+1}/{num_epochs}] - Train Loss: {avg_train_loss:.4f}, "
                   f"Val Loss: {avg_val_loss:.4f}, "
                   f"Train Acc: {avg_train_acc*100:.1f}%, "
                   f"Val Acc: {avg_val_acc*100:.1f}% - Elapsed: {elapsed_str}, "
@@ -275,9 +289,7 @@ def main():
     with open(history_file, 'w') as f:
         json.dump(history, f, indent=2)
 
-    print("\nTraining complete!")
-
-    # TODO: save terminal outputs to a log file in the results folder
+    logger.info("\nTraining complete!")
 
 if __name__ == '__main__':
     main()
