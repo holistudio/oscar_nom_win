@@ -1,0 +1,44 @@
+{
+  "model": {
+    "module": "causal_transformer",
+    "class_name": "OscarNomTransformer",
+    "params": {
+      "chunk_size": 1024,
+      "vocab_size": 50257,
+      "enc_d_model": 128,
+      "enc_nhead": 2,
+      "enc_num_layers": 2,
+      "agg_d_model": 128,
+      "agg_nhead": 2,
+      "agg_num_layers": 1,
+      "max_seq_len": 106578,
+      "dropout": 0.1
+    }
+  },
+  "training": {
+    "epochs": 5,
+    "batch_size": 2,
+    "peak_lr": 3e-4,
+    "weight_decay": 0.1,
+    "eta_min": 1e-06,
+    "warmup_fraction": 0.1,
+    "grad_clip": 1.0,
+    "class_weights": [
+      1.0,
+      4.0
+    ],
+    "label_smoothing": 0.1,
+    "seed": 1337,
+    "checkpoint_prefix": "causal_transformer",
+    "models_dir": "../models",
+    "results_dir": "../results",
+    "sub_dir": "260428_local_run",
+    "history_filename": "training_history.json"
+  },
+  "data": {
+    "train_path": "./token_data/train_tokenized.pkl",
+    "val_path": "./token_data/val_tokenized.pkl",
+    "test_path": "./token_data/test_tokenized.pkl",
+    "subsample": null
+  }
+}
