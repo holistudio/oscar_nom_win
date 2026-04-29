@@ -8,6 +8,7 @@ import logging
 import torch
 import torch.nn.functional as F
 from torch.utils.data import DataLoader
+from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, roc_auc_score
 
 from datasets import OscarScriptDataset
 
@@ -99,10 +100,9 @@ def main():
     total = 0
     all_predictions = []
     all_targets = []
-    all_probabilities = []  # Store probabilities for ROC curve
+    all_probabilities = []  # store probabilities for ROC curve
     results = []
 
-    # Disable gradient computation for inference
     with torch.no_grad():
         for batch_idx, batch in enumerate(test_dataloader):
             imdb_ids = batch['imdb_id']
@@ -132,7 +132,6 @@ def main():
             all_targets.extend(targets_list)
             all_probabilities.extend(probs_list)
 
-            # Build per-sample records (batch may have multiple samples)
             for i in range(len(targets_list)):
                 sample_idx = batch_idx * training_cfg['batch_size'] + i
                 results.append({
@@ -143,17 +142,28 @@ def main():
                     "model_prob": round(probs_list[i], 6)
                 })
 
-            # Progress update
             if (batch_idx + 1) % 5 == 0:
                 logger.info(f"  Processed {batch_idx + 1}/{len(test_dataloader)} batches")
 
-    # Calculate and display final accuracy
-    accuracy = 100 * correct / total
+    acc       = accuracy_score(all_targets, all_predictions)
+    precision = precision_score(all_targets, all_predictions, average='binary', pos_label=1)
+    recall    = recall_score(all_targets, all_predictions, average='binary', pos_label=1)
+    f1        = f1_score(all_targets, all_predictions, average='binary', pos_label=1)
+    macro_f1  = f1_score(all_targets, all_predictions, average='macro')
+    auc       = roc_auc_score(all_targets, all_probabilities)
+
     logger.info(f"\n{'='*60}")
-    logger.info(f"Test Accuracy: {accuracy:.2f}% ({correct}/{total} correct)")
+    logger.info(f"Test Results ({correct}/{total} correct)")
+    logger.info(f"{'='*60}")
+    logger.info(f"  Accuracy:   {acc * 100:.2f}%")
+    logger.info(f"  Precision:  {precision * 100:.2f}%")
+    logger.info(f"  Recall:     {recall * 100:.2f}%")
+    logger.info(f"  F1:         {f1 * 100:.2f}%")
+    logger.info(f"  Macro-F1:   {macro_f1 * 100:.2f}%")
+    logger.info(f"  AUC:        {auc:.4f}")
     logger.info(f"{'='*60}")
 
-    # Save results JSON to same directory as model checkpoint
+    # save results JSON to same directory as model checkpoint
     results_path = results_dir / f"{checkpoint_prefix}_test_results.json"
     with open(results_path, 'w') as f:
         json.dump(results, f, indent=4)
