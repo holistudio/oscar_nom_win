@@ -5,24 +5,61 @@
 Circling back to this...
 
 Couple thing I'm most interested in doing:
-- Revisit chunky transformer model
-- Figure out how `train.py` can take any arbitrary model architecture and train it
-- See what it would take to train models on RunPod
+- ~~Revisit chunky transformer model~~
+- ~~Figure out how `train.py` can take any arbitrary model architecture and train it~~
+- See what it would take to train models on W&B + RunPod
 - Look at distributions of words in the dataset: are there words that show up more frequently in Oscar nominated films or not?
 - A similar question can be asked for the model predictions (i.e. "the model seems to think that words X, Y, Z increase probability...")
 
+### Chunky Transformer Revisit
+
 Did a visual documentation of how the current chunky transformer model works. While I think it's OK, it feels like it works differently than how I originally imagined it to work. And it feels like the mean pooling is doing a lot of heavy lifting to compress things.
 
-diagram tk
+It just bothered me that mean pooling was "compressing" sequences when I had used transformers before to "compress into vector" without having to resort to mean pooling...so how did I do it?
 
-From Raschka's *Building LLMs from Scratch* book chapter on classification fine tuning I was thinking of some other way that involves a Transformer Decoder with causal attention mask.
+It took me awhile to draw out how everything goes from a sequence of tokens for each screenplay into tensors of all shapes and sizes...
 
-diagram tk
+<img src="./docs/design/260429_chunky_trf.png">
 
-Will revisit this later but first a recap of what the `src` and `notebooks` files are doing and how they relate to each other
+From Raschka's *Building LLMs from Scratch* book chapter on classification fine tuning I realized that one alternative to mean pooling was to use a causal attention mask on the transformer and then look at the last row/slice.
+
+<img src="./docs/design/260429_mean_vs_slice.png">
+
+Originally (above) the transformer blocks (both encoder and aggregator) did not use a causal mask, so all outputs of the chunk sequence could attend to each other. A causal mask forces outputs to only attend to previous outputs, thereby "accumulating" information to the last output. Then it would only make sense to look at the last slice before passing to aggregator modules or classification head.
+
+So I wrote two different transformer models, `mean_transformer.py` and `causal_transformer.py`, to implement the above "compression methods."
+
+Will revisit this some more later, since neither of the above two ways of "compressing sequences" is better than the other, depends on the situation. I am more interested in causal transformer but only because for now I am curious about the "limits of GPT-2."
+
+But first a recap of what the `src` and `notebooks` files are doing and how they relate to each other in a pipeline...
 
 
-### Recap of models made so far
+### Pipeline Revisit
+
+After reviewing the janky/messy way I set up the code for some quick model training/test runs, I re-organized and revised files to work in the following pipeline.
+
+<img src="./docs/260428_pipeline.png">
+
+The basic idea is that now `train.py` and `test.py` can take whatever model architecture is defined in any separate Python file, define it with hyperparameters, and train with specific parameters, all defined in a `config.json` file.
+
+Then the notebook is used only to visualize results rather than run models within them.
+
+### Using GPT-2 pre-trained weights
+
+Major change I think moving forward is to treat the pre-trained GPT-2 model as a script embeddings "generator." The GPT-2 model should just go through the entire dataset chunk by chunk, however big the context window allows, and generate 768-dim or w/e dim vector sequences...that another transformer model can then read/process to make Oscar nomination probability predictions.
+- This would restrict the use of further fine-tuning the GPT-2 weights...
+- But save GPU memory for testing a "full model" that involves frozen GPT-2 weights
+- Initially the idea of "loading GPT-2 weights, then freeze, then train/finetune new layers" seemed like the right idea following Raschka's Building LLMs from Scratch classification example. But that's only OK for "small sequences" (though even then, computing the same numbers with frozen weights from an LLM is wasteful) or really "demo examples for beginners"
+
+So the "big matchup" in my mind for now is the `causal_transformer` trained from scratch vs the same `aggregator` within causal transformer architecture being fed GPT-2 generated screenplay embeddings. Specifically:
+- Train/hyperparameter tune `causal_transformer` from scratch
+- (likely needed but not "the plan": switch the causal_transformer's `aggregator` half to NOT use the causal mask)
+- Then use GPT-2 pre-trained weights to generate screenplay embeddings.
+- Then, take the same aggregator half architecture but feed it the GPT-2 embeddings. 
+  - The aggregator can be trained from scratch using the same hyperparameters as the `causal_transformer` architecture's aggregator
+  - OR the aggregator can have its weights initialized to whatever the best `causal_transformer` weights are. 
+
+If there is some meaningful improvement in performance on the test dataset, this would indicate some "value add" from GPT-2's pretrained weights. (it's a big IF)
 
 ## 2026-03-07
 
