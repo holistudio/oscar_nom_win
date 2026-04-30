@@ -438,6 +438,20 @@ def main():
                 f" - Elapsed: {elapsed_str}, Avg/Epoch: {avg_time_str}{tail}"
             )
 
+            run.log({
+                "train/loss": avg_train_loss,
+                "val/loss": avg_val_loss,
+                "train/acc": avg_train_acc,
+                "val/acc": avg_val_acc,
+                "val/auc": float(val_auc),
+                "val/prec": float(val_prec),
+                "val/rec": float(val_rec),
+                "val/f1": float(val_f1),
+                "epoch_time_seconds": epoch_time,
+                "learning_rate": scheduler.get_last_lr()[0],
+                "epoch": epoch + 1,
+            })
+
             # save training history every epoch
             history_filename = f"{checkpoint_prefix}_{training_cfg.get('history_filename', 'training_history.json')}"
             history_file = results_dir / history_filename
