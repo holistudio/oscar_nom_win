@@ -66,6 +66,11 @@ def main():
 
     parser.add_argument('--config', type=str, required=True,
                         help='Path to JSON config file')
+
+    parser.add_argument('--new-wandb-run', action='store_true',
+                    help="Force a fresh W&B run for this test instead of "
+                    "resuming the training run stored in the checkpoint.")
+    
     args = parser.parse_args()
 
     # load config
@@ -123,6 +128,18 @@ def main():
     
     total_params = sum(p.numel() for p in model.parameters())
     logger.info(f"Total model parameters: {total_params:,}")
+
+    # pull the W&B run id from the checkpoint so tie the test to
+    # same W&B run as training, unless --new-wandb-run was passed
+    train_run_id = None if args.new_wandb_run else checkpoint.get('wandb_run_id')
+
+    # initialize W&B
+    wandb_run = init_wandb(cfg, results_dir, train_run_id=train_run_id)
+    if wandb_run is not None:
+        if train_run_id:
+            logger.info(f"W&B: continuing run id={wandb_run.id} for test logging")
+        else:
+            logger.info(f"W&B: started fresh test run id={wandb_run.id}")
 
     logger.info("Evaluating model on test set...")
     model.eval()
