@@ -151,71 +151,75 @@ def main():
     all_probabilities = []  # store probabilities for ROC curve
     results = []
 
-    with torch.no_grad():
-        for batch_idx, batch in enumerate(test_dataloader):
-            imdb_ids = batch['imdb_id']
-            # Move data to device
-            input_ids = batch['input_ids'].to(device)
-            targets = batch['target'].to(device)
+    try:
+        with torch.no_grad():
+            for batch_idx, batch in enumerate(test_dataloader):
+                imdb_ids = batch['imdb_id']
+                # Move data to device
+                input_ids = batch['input_ids'].to(device)
+                targets = batch['target'].to(device)
 
-            # Forward pass - get model predictions
-            logits = model(input_ids)
+                # Forward pass - get model predictions
+                logits = model(input_ids)
 
-            # Get predicted class (0 or 1)
-            predictions = torch.argmax(logits, dim=1)
+                # Get predicted class (0 or 1)
+                predictions = torch.argmax(logits, dim=1)
 
-            # Get probabilities for positive class (nominated = 1)
-            probabilities = F.softmax(logits, dim=1)[:, 1]  # Probability of class 1
+                # Get probabilities for positive class (nominated = 1)
+                probabilities = F.softmax(logits, dim=1)[:, 1]  # Probability of class 1
 
-            # Update accuracy metrics
-            correct += (predictions == targets).sum().item()
-            total += targets.size(0)
+                # Update accuracy metrics
+                correct += (predictions == targets).sum().item()
+                total += targets.size(0)
 
-            # Store predictions, targets, and probabilities
-            preds_list = predictions.cpu().numpy().tolist()
-            targets_list = targets.cpu().numpy().tolist()
-            probs_list = probabilities.cpu().numpy().tolist()
+                # Store predictions, targets, and probabilities
+                preds_list = predictions.cpu().numpy().tolist()
+                targets_list = targets.cpu().numpy().tolist()
+                probs_list = probabilities.cpu().numpy().tolist()
 
-            all_predictions.extend(preds_list)
-            all_targets.extend(targets_list)
-            all_probabilities.extend(probs_list)
+                all_predictions.extend(preds_list)
+                all_targets.extend(targets_list)
+                all_probabilities.extend(probs_list)
 
-            for i in range(len(targets_list)):
-                sample_idx = batch_idx * training_cfg['batch_size'] + i
-                results.append({
-                    "idx": sample_idx,
-                    "imdb_id": imdb_ids[i],
-                    "target": targets_list[i],
-                    "model_prediction": preds_list[i],
-                    "model_prob": round(probs_list[i], 6)
-                })
+                for i in range(len(targets_list)):
+                    sample_idx = batch_idx * training_cfg['batch_size'] + i
+                    results.append({
+                        "idx": sample_idx,
+                        "imdb_id": imdb_ids[i],
+                        "target": targets_list[i],
+                        "model_prediction": preds_list[i],
+                        "model_prob": round(probs_list[i], 6)
+                    })
 
-            if (batch_idx + 1) % 10 == 0:
-                logger.info(f"  Processed {batch_idx + 1}/{len(test_dataloader)} batches")
+                if (batch_idx + 1) % 10 == 0:
+                    logger.info(f"  Processed {batch_idx + 1}/{len(test_dataloader)} batches")
 
-    acc       = accuracy_score(all_targets, all_predictions)
-    precision = precision_score(all_targets, all_predictions, average='binary', pos_label=1)
-    recall    = recall_score(all_targets, all_predictions, average='binary', pos_label=1)
-    f1        = f1_score(all_targets, all_predictions, average='binary', pos_label=1)
-    macro_f1  = f1_score(all_targets, all_predictions, average='macro')
-    auc       = roc_auc_score(all_targets, all_probabilities)
+        acc       = accuracy_score(all_targets, all_predictions)
+        precision = precision_score(all_targets, all_predictions, average='binary', pos_label=1)
+        recall    = recall_score(all_targets, all_predictions, average='binary', pos_label=1)
+        f1        = f1_score(all_targets, all_predictions, average='binary', pos_label=1)
+        macro_f1  = f1_score(all_targets, all_predictions, average='macro')
+        auc       = roc_auc_score(all_targets, all_probabilities)
 
-    logger.info(f"\n{'='*60}")
-    logger.info(f"Test Results ({correct}/{total} correct)")
-    logger.info(f"{'='*60}")
-    logger.info(f"  Accuracy:   {acc * 100:.2f}%")
-    logger.info(f"  Precision:  {precision * 100:.2f}%")
-    logger.info(f"  Recall:     {recall * 100:.2f}%")
-    logger.info(f"  F1:         {f1 * 100:.2f}%")
-    logger.info(f"  Macro-F1:   {macro_f1 * 100:.2f}%")
-    logger.info(f"  AUC:        {auc:.4f}")
-    logger.info(f"{'='*60}")
+        logger.info(f"\n{'='*60}")
+        logger.info(f"Test Results ({correct}/{total} correct)")
+        logger.info(f"{'='*60}")
+        logger.info(f"  Accuracy:   {acc * 100:.2f}%")
+        logger.info(f"  Precision:  {precision * 100:.2f}%")
+        logger.info(f"  Recall:     {recall * 100:.2f}%")
+        logger.info(f"  F1:         {f1 * 100:.2f}%")
+        logger.info(f"  Macro-F1:   {macro_f1 * 100:.2f}%")
+        logger.info(f"  AUC:        {auc:.4f}")
+        logger.info(f"{'='*60}")
 
-    # save results JSON to same directory as model checkpoint
-    results_path = results_dir / f"{checkpoint_prefix}_test_results.json"
-    with open(results_path, 'w') as f:
-        json.dump(results, f, indent=4)
-    logger.info(f"\nTest dataset predictions saved to {results_path}")
+        # save results JSON to same directory as model checkpoint
+        results_path = results_dir / f"{checkpoint_prefix}_test_results.json"
+        with open(results_path, 'w') as f:
+            json.dump(results, f, indent=4)
+        logger.info(f"\nTest dataset predictions saved to {results_path}")
+    finally:
+        if wandb_run is not None:
+            wandb.finish()
 
 if __name__ == "__main__":
     main()
