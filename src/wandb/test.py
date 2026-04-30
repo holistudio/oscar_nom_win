@@ -12,6 +12,8 @@ from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_sc
 
 from datasets import OscarScriptDataset
 
+import wandb
+
 def build_dataloaders(test_dataset, training_cfg):
     bs = training_cfg['batch_size']
     test_dataloader = DataLoader(test_dataset,
@@ -28,6 +30,35 @@ def build_model(model_cfg, device):
 
     model = ModelClass(model_cfg['params']).to(device)
     return model
+
+def init_wandb(cfg, results_dir, train_run_id=None):
+    """Initialize a W&B run for testing.
+
+    If train_run_id is given (pulled from the loaded checkpoint), 
+    resume that run so train and test metrics land in the SAME W&B run.
+    Otherwise start a fresh run with job_type='test'.
+    """
+    wandb_cfg = cfg.get('wandb', {})
+    if not wandb_cfg.get('enabled', False):
+        return None
+
+    training_cfg = cfg['training']
+    default_name = f"{training_cfg['sub_dir']}_{training_cfg['checkpoint_prefix']}_test"
+
+    run = wandb.init(
+        project=wandb_cfg.get('project', 'oscar_nom_win'),
+        entity=wandb_cfg.get('entity'),
+        mode=wandb_cfg.get('mode', 'offline'),
+        name=wandb_cfg.get('name') or default_name,
+        notes=wandb_cfg.get('notes', training_cfg.get('notes', '')),
+        tags=(wandb_cfg.get('tags', training_cfg.get('tags', [])) or []) + ["test"],
+        config=cfg,
+        dir=str(results_dir),
+        id=train_run_id,
+        resume="allow" if train_run_id else None,
+        job_type="test",
+    )
+    return run
 
 def main():
     # argument parsing
