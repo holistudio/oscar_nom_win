@@ -167,6 +167,7 @@ def main():
 
     # CUDA device
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
+    amp_dtype = torch.bfloat16 if device.type == 'cuda' else torch.float32
     logger.info(f'Device: {device}\n')
 
     # load data
@@ -308,8 +309,9 @@ def main():
             targets = batch['target'].to(device)
 
             optimizer.zero_grad()
-            logits = model(input_ids)
-            loss = criterion(logits, targets)
+            with torch.autocast(device_type=device.type, dtype=amp_dtype):
+                logits = model(input_ids)
+                loss = criterion(logits, targets)
             loss.backward()
             
             torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=grad_clip)
@@ -336,8 +338,9 @@ def main():
                 input_ids = batch['input_ids'].to(device)
                 targets = batch['target'].to(device)
 
-                logits = model(input_ids)
-                loss = criterion(logits, targets)
+                with torch.autocast(device_type=device.type, dtype=amp_dtype):
+                    logits = model(input_ids)
+                    loss = criterion(logits, targets)
 
                 preds = torch.argmax(logits, dim=-1)
                 probs = torch.softmax(logits, dim=-1)[:, 1]
