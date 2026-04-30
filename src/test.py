@@ -14,10 +14,9 @@ from datasets import OscarScriptDataset
 
 import wandb
 
-def build_dataloaders(test_dataset, training_cfg):
-    bs = training_cfg['batch_size']
+def build_dataloaders(test_dataset, batch_size):
     test_dataloader = DataLoader(test_dataset,
-                                 batch_size=bs,
+                                 batch_size=batch_size,
                                  shuffle=False, num_workers=2)
     return test_dataloader
 
@@ -70,6 +69,13 @@ def main():
     parser.add_argument('--new-wandb-run', action='store_true',
                     help="Force a fresh W&B run for this test instead of "
                     "resuming the training run stored in the checkpoint.")
+
+    parser.add_argument('--test-batch-size', type=int, default=1,
+                        help='Batch size for test inference. Default 1 to avoid OOM '
+                             'on long scripts. Override config training batch_size.')
+
+    parser.add_argument('--no-amp', action='store_true',
+                        help='Disable bfloat16 autocast during inference.')
     
     args = parser.parse_args()
 
@@ -110,13 +116,19 @@ def main():
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
     logger.info(f'Device: {device}\n')
 
+    # decide AMP usage: bf16 on CUDA unless --no-amp passed
+    use_amp = (not args.no_amp) and (device.type == 'cuda')
+    amp_dtype = torch.bfloat16
+    logger.info(f"Inference AMP: {'bfloat16' if use_amp else 'disabled (fp32)'}")
+    logger.info(f"Test batch size: {args.test_batch_size}")
+
     with open(data_cfg['test_path'], 'rb') as f:
         test_items = pickle.load(f)
 
     max_seq_len = model_cfg['params']['max_seq_len']
     
     test_dataset = OscarScriptDataset(test_items, max_length=max_seq_len)
-    test_dataloader = build_dataloaders(test_dataset, training_cfg)
+    test_dataloader = build_dataloaders(test_dataset, args.test_batch_size)
 
     # define model
     
@@ -160,8 +172,11 @@ def main():
                 targets = batch['target'].to(device)
 
                 # Forward pass - get model predictions
-                logits = model(input_ids)
+                with torch.amp.autocast(device_type='cuda', dtype=amp_dtype, enabled=use_amp):
                     logits = model(input_ids)
+
+                # cast logits back to fp32 for numerically clean softmax/argmax
+                logits = logits.float()
 
                 # Get predicted class (0 or 1)
                 predictions = torch.argmax(logits, dim=1)
@@ -183,7 +198,7 @@ def main():
                 all_probabilities.extend(probs_list)
 
                 for i in range(len(targets_list)):
-                    sample_idx = batch_idx * training_cfg['batch_size'] + i
+                    sample_idx = batch_idx * args.test_batch_size + i
                     results.append({
                         "idx": sample_idx,
                         "imdb_id": imdb_ids[i],
