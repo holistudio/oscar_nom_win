@@ -12,6 +12,8 @@ from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_sc
 
 from datasets import OscarScriptDataset
 
+import wandb
+
 def build_dataloaders(test_dataset, training_cfg):
     bs = training_cfg['batch_size']
     test_dataloader = DataLoader(test_dataset,
@@ -29,12 +31,46 @@ def build_model(model_cfg, device):
     model = ModelClass(model_cfg['params']).to(device)
     return model
 
+def init_wandb(cfg, results_dir, train_run_id=None):
+    """Initialize a W&B run for testing.
+
+    If train_run_id is given (pulled from the loaded checkpoint), 
+    resume that run so train and test metrics land in the SAME W&B run.
+    Otherwise start a fresh run with job_type='test'.
+    """
+    wandb_cfg = cfg.get('wandb', {})
+    if not wandb_cfg.get('enabled', False):
+        return None
+
+    training_cfg = cfg['training']
+    default_name = f"{training_cfg['sub_dir']}_{training_cfg['checkpoint_prefix']}_test"
+
+    run = wandb.init(
+        project=wandb_cfg.get('project', 'oscar_nom_win'),
+        entity=wandb_cfg.get('entity'),
+        mode=wandb_cfg.get('mode', 'offline'),
+        name=wandb_cfg.get('name') or default_name,
+        notes=wandb_cfg.get('notes', training_cfg.get('notes', '')),
+        tags=(wandb_cfg.get('tags', training_cfg.get('tags', [])) or []) + ["test"],
+        config=cfg,
+        dir=str(results_dir),
+        id=train_run_id,
+        resume="allow" if train_run_id else None,
+        job_type="test",
+    )
+    return run
+
 def main():
     # argument parsing
     parser = argparse.ArgumentParser(description='Oscar nomination prediction model test evaluator')
 
     parser.add_argument('--config', type=str, required=True,
                         help='Path to JSON config file')
+
+    parser.add_argument('--new-wandb-run', action='store_true',
+                    help="Force a fresh W&B run for this test instead of "
+                    "resuming the training run stored in the checkpoint.")
+    
     args = parser.parse_args()
 
     # load config
@@ -93,6 +129,18 @@ def main():
     total_params = sum(p.numel() for p in model.parameters())
     logger.info(f"Total model parameters: {total_params:,}")
 
+    # pull the W&B run id from the checkpoint so tie the test to
+    # same W&B run as training, unless --new-wandb-run was passed
+    train_run_id = None if args.new_wandb_run else checkpoint.get('wandb_run_id')
+
+    # initialize W&B
+    wandb_run = init_wandb(cfg, results_dir, train_run_id=train_run_id)
+    if wandb_run is not None:
+        if train_run_id:
+            logger.info(f"W&B: continuing run id={wandb_run.id} for test logging")
+        else:
+            logger.info(f"W&B: started fresh test run id={wandb_run.id}")
+
     logger.info("Evaluating model on test set...")
     model.eval()
 
@@ -103,71 +151,127 @@ def main():
     all_probabilities = []  # store probabilities for ROC curve
     results = []
 
-    with torch.no_grad():
-        for batch_idx, batch in enumerate(test_dataloader):
-            imdb_ids = batch['imdb_id']
-            # Move data to device
-            input_ids = batch['input_ids'].to(device)
-            targets = batch['target'].to(device)
+    try:
+        with torch.no_grad():
+            for batch_idx, batch in enumerate(test_dataloader):
+                imdb_ids = batch['imdb_id']
+                # Move data to device
+                input_ids = batch['input_ids'].to(device)
+                targets = batch['target'].to(device)
 
-            # Forward pass - get model predictions
-            logits = model(input_ids)
+                # Forward pass - get model predictions
+                logits = model(input_ids)
 
-            # Get predicted class (0 or 1)
-            predictions = torch.argmax(logits, dim=1)
+                # Get predicted class (0 or 1)
+                predictions = torch.argmax(logits, dim=1)
 
-            # Get probabilities for positive class (nominated = 1)
-            probabilities = F.softmax(logits, dim=1)[:, 1]  # Probability of class 1
+                # Get probabilities for positive class (nominated = 1)
+                probabilities = F.softmax(logits, dim=1)[:, 1]  # Probability of class 1
 
-            # Update accuracy metrics
-            correct += (predictions == targets).sum().item()
-            total += targets.size(0)
+                # Update accuracy metrics
+                correct += (predictions == targets).sum().item()
+                total += targets.size(0)
 
-            # Store predictions, targets, and probabilities
-            preds_list = predictions.cpu().numpy().tolist()
-            targets_list = targets.cpu().numpy().tolist()
-            probs_list = probabilities.cpu().numpy().tolist()
+                # Store predictions, targets, and probabilities
+                preds_list = predictions.cpu().numpy().tolist()
+                targets_list = targets.cpu().numpy().tolist()
+                probs_list = probabilities.cpu().numpy().tolist()
 
-            all_predictions.extend(preds_list)
-            all_targets.extend(targets_list)
-            all_probabilities.extend(probs_list)
+                all_predictions.extend(preds_list)
+                all_targets.extend(targets_list)
+                all_probabilities.extend(probs_list)
 
-            for i in range(len(targets_list)):
-                sample_idx = batch_idx * training_cfg['batch_size'] + i
-                results.append({
-                    "idx": sample_idx,
-                    "imdb_id": imdb_ids[i],
-                    "target": targets_list[i],
-                    "model_prediction": preds_list[i],
-                    "model_prob": round(probs_list[i], 6)
-                })
+                for i in range(len(targets_list)):
+                    sample_idx = batch_idx * training_cfg['batch_size'] + i
+                    results.append({
+                        "idx": sample_idx,
+                        "imdb_id": imdb_ids[i],
+                        "target": targets_list[i],
+                        "model_prediction": preds_list[i],
+                        "model_prob": round(probs_list[i], 6)
+                    })
 
-            if (batch_idx + 1) % 10 == 0:
-                logger.info(f"  Processed {batch_idx + 1}/{len(test_dataloader)} batches")
+                if (batch_idx + 1) % 10 == 0:
+                    logger.info(f"  Processed {batch_idx + 1}/{len(test_dataloader)} batches")
 
-    acc       = accuracy_score(all_targets, all_predictions)
-    precision = precision_score(all_targets, all_predictions, average='binary', pos_label=1)
-    recall    = recall_score(all_targets, all_predictions, average='binary', pos_label=1)
-    f1        = f1_score(all_targets, all_predictions, average='binary', pos_label=1)
-    macro_f1  = f1_score(all_targets, all_predictions, average='macro')
-    auc       = roc_auc_score(all_targets, all_probabilities)
+        acc       = accuracy_score(all_targets, all_predictions)
+        precision = precision_score(all_targets, all_predictions, average='binary', pos_label=1)
+        recall    = recall_score(all_targets, all_predictions, average='binary', pos_label=1)
+        f1        = f1_score(all_targets, all_predictions, average='binary', pos_label=1)
+        macro_f1  = f1_score(all_targets, all_predictions, average='macro')
+        auc       = roc_auc_score(all_targets, all_probabilities)
 
-    logger.info(f"\n{'='*60}")
-    logger.info(f"Test Results ({correct}/{total} correct)")
-    logger.info(f"{'='*60}")
-    logger.info(f"  Accuracy:   {acc * 100:.2f}%")
-    logger.info(f"  Precision:  {precision * 100:.2f}%")
-    logger.info(f"  Recall:     {recall * 100:.2f}%")
-    logger.info(f"  F1:         {f1 * 100:.2f}%")
-    logger.info(f"  Macro-F1:   {macro_f1 * 100:.2f}%")
-    logger.info(f"  AUC:        {auc:.4f}")
-    logger.info(f"{'='*60}")
+        logger.info(f"\n{'='*60}")
+        logger.info(f"Test Results ({correct}/{total} correct)")
+        logger.info(f"{'='*60}")
+        logger.info(f"  Accuracy:   {acc * 100:.2f}%")
+        logger.info(f"  Precision:  {precision * 100:.2f}%")
+        logger.info(f"  Recall:     {recall * 100:.2f}%")
+        logger.info(f"  F1:         {f1 * 100:.2f}%")
+        logger.info(f"  Macro-F1:   {macro_f1 * 100:.2f}%")
+        logger.info(f"  AUC:        {auc:.4f}")
+        logger.info(f"{'='*60}")
 
-    # save results JSON to same directory as model checkpoint
-    results_path = results_dir / f"{checkpoint_prefix}_test_results.json"
-    with open(results_path, 'w') as f:
-        json.dump(results, f, indent=4)
-    logger.info(f"\nTest dataset predictions saved to {results_path}")
+        # save results JSON to same directory as model checkpoint
+        results_path = results_dir / f"{checkpoint_prefix}_test_results.json"
+        with open(results_path, 'w') as f:
+            json.dump(results, f, indent=4)
+        logger.info(f"\nTest dataset predictions saved to {results_path}")
+
+        if wandb_run is not None:
+            wandb.log({
+                "test/accuracy":  acc,
+                "test/precision": precision,
+                "test/recall":    recall,
+                "test/f1":        f1,
+                "test/macro_f1":  macro_f1,
+                "test/auc":       auc,
+            })
+
+            # W&B leaderboard summary metrics
+            wandb.run.summary["test/accuracy"]  = acc
+            wandb.run.summary["test/precision"] = precision
+            wandb.run.summary["test/recall"]    = recall
+            wandb.run.summary["test/f1"]        = f1
+            wandb.run.summary["test/macro_f1"]  = macro_f1
+            wandb.run.summary["test/auc"]       = auc
+
+            # W&B confusion matrix plot
+            wandb.log({
+                "test/confusion_matrix": wandb.plot.confusion_matrix(
+                    y_true=all_targets,
+                    preds=all_predictions,
+                    class_names=["Not Nominated", "Nominated"],
+                )
+            })
+
+            # W&B ROC curve
+            roc_probs = [[1.0 - p, p] for p in all_probabilities]
+            wandb.log({
+                "test/roc": wandb.plot.roc_curve(
+                    y_true=all_targets,
+                    y_probas=roc_probs,
+                    labels=["Not Nominated", "Nominated"],
+                )
+            })
+
+            # per-prediction table
+            pred_table = wandb.Table(
+                columns=["idx", "imdb_id", "target", "prediction", "prob_nominated", "correct"],
+                data=[[
+                    r["idx"],
+                    r["imdb_id"],
+                    r["target"],
+                    r["model_prediction"],
+                    r["model_prob"],
+                    int(r["target"] == r["model_prediction"]),
+                ] for r in results],
+            )
+            wandb.log({"test/predictions": pred_table})
+
+    finally:
+        if wandb_run is not None:
+            wandb.finish()
 
 if __name__ == "__main__":
     main()
