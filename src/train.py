@@ -472,7 +472,7 @@ def main():
                 f"Epoch [{epoch+1}/{num_epochs}] - Train Loss: {avg_train_loss:.4f}, "
                 f"Val Loss: {avg_val_loss:.4f}, "
                 f"Train Acc: {avg_train_acc*100:.1f}%, "
-                f"Val Acc: {avg_val_acc*100:.1f}%"
+                f"Val Acc: {avg_val_acc*100:.1f}%, "
                 f"Val AUC: {val_auc:.3f}, "
                 f"Val P/R/F1: {val_prec:.2f}/{val_rec:.2f}/{val_f1:.2f}"
                 f" - Elapsed: {elapsed_str}, Avg/Epoch: {avg_time_str}{tail}"
