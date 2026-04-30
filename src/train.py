@@ -452,6 +452,7 @@ def main():
                 'best_val_metric': best_val_metric,
                 'history': history,
                 'config': cfg,
+                'wandb_run_id': wandb_run.id if wandb_run is not None else None,
             }
 
             # save latest checkpoint
