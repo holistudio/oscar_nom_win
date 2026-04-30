@@ -463,8 +463,10 @@ def main():
 
                 torch.save(ckpt_payload, best_path)
                 tail = " - New best! Model saved."
+                new_best = True
             else:
                 tail = ""
+                new_best = False
 
             logger.info(
                 f"Epoch [{epoch+1}/{num_epochs}] - Train Loss: {avg_train_loss:.4f}, "
@@ -475,6 +477,22 @@ def main():
                 f"Val P/R/F1: {val_prec:.2f}/{val_rec:.2f}/{val_f1:.2f}"
                 f" - Elapsed: {elapsed_str}, Avg/Epoch: {avg_time_str}{tail}"
             )
+
+            if wandb_run is not None:
+                wandb.log({
+                    "train/loss":      avg_train_loss,
+                    "train/acc":       avg_train_acc,
+                    "val/loss":        avg_val_loss,
+                    "val/acc":         avg_val_acc,
+                    "val/auc":         float(val_auc),
+                    "val/precision":   float(val_prec),
+                    "val/recall":      float(val_rec),
+                    "val/f1":          float(val_f1),
+                    "lr":              scheduler.get_last_lr()[0],
+                    "epoch_time_sec":  epoch_time,
+                    "best_val_metric": best_val_metric,
+                    "new_best":        int(new_best),
+                }, step=epoch + 1)
 
             # save training history every epoch
             history_filename = f"{checkpoint_prefix}_{training_cfg.get('history_filename', 'training_history.json')}"
