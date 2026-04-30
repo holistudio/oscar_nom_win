@@ -1,6 +1,25 @@
 # Development Log
 
-## 2026-04-24
+## 2026-04-29
+
+**TODOS:**
+- [x] Add additional classification metrics to display at the end of `test.py`
+- [x] Diagnose why time/epoch is increasing.
+- [x] Modify `train.py` to also use AUC/F-1 as basis for selecting best model
+- [x] Use mixed precision (`train.py`)
+
+- [ ] Set up W&B
+- [ ] Start with 5 epoch learning rate schedule
+- [ ] Run smaller config training
+- [ ] Run GPU temperature logging in separate terminal
+- [ ] See results on W&B
+- [ ] Run original large config training
+- [ ] Run GPU temperature logging in separate terminal
+- [ ] See results on W&B
+- [ ] ...
+
+
+## 2026-04-28
 
 Circling back to this...
 
