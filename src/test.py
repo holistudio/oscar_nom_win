@@ -142,7 +142,7 @@ def main():
                     "model_prob": round(probs_list[i], 6)
                 })
 
-            if (batch_idx + 1) % 5 == 0:
+            if (batch_idx + 1) % 10 == 0:
                 logger.info(f"  Processed {batch_idx + 1}/{len(test_dataloader)} batches")
 
     acc       = accuracy_score(all_targets, all_predictions)
