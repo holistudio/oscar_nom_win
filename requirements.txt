@@ -11,3 +11,5 @@ ipykernel
 tqdm
 ipywidgets
 tensorflow
+
+wandb
