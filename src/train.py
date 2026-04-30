@@ -269,6 +269,7 @@ def main():
                'train_acc': [], 'val_acc': [],
                'val_prec': [], 'val_rec': [], 'val_f1': [], 'val_auc': []}
     
+    # selection metric is AUC on validation dataset
     best_val_metric = float('-inf')
     start_epoch = 0  # assume for fresh run
     resume_wandb_id = None
@@ -434,10 +435,8 @@ def main():
             history['val_rec'].append(float(val_rec))
             history['val_f1'].append(float(val_f1))
 
-            # F1 score default metric for saving best checkpoint
-            # AUC is fallback metric when F1 is collapsed to 0, but is mapped to [-1, 0] range
-            # so that when F1 does improve, `if val_metric > best_val_metric:` still works below
-            val_metric = val_f1 if val_f1 > 0 else (val_auc - 1.0 if not math.isnan(val_auc) else -1.0)
+            # AUC is the checkpoint selection metric 
+            val_metric = float(val_auc) if not math.isnan(val_auc) else -1.0
 
             # build checkpoint payload once, reuse for latest and best models 
             ckpt_payload = {
@@ -458,7 +457,7 @@ def main():
             # save latest checkpoint
             torch.save(ckpt_payload, latest_path)
 
-            # save best checkpoint when val loss improves
+            # save best checkpoint when AUC improves
             if val_metric > best_val_metric:
                 best_val_metric = val_metric
 
