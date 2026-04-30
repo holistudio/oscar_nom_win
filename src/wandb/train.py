@@ -300,9 +300,9 @@ def main():
     epoch_times = []
 
     with wandb.init(
-        project="oscar-nomination-prediction",
-        name=f"{checkpoint_prefix}_{training_cfg['sub_dir']}",
-        notes="Describe what you're trying this run",
+        project="oscar_nom_win",
+        name=f"{training_cfg['sub_dir']}_{checkpoint_prefix}",
+        notes=training_cfg['notes'],
         tags=training_cfg['tags'],   # adjust per run
         config=cfg,                            # logs your entire JSON config
         job_type="train",
@@ -425,6 +425,12 @@ def main():
 
                 torch.save(ckpt_payload, best_path)
                 tail = " - New best! Model saved."
+
+                run.log_artifact(
+                    str(best_path),
+                    name=f"{checkpoint_prefix}_best",
+                    type="model",
+                )
             else:
                 tail = ""
 
