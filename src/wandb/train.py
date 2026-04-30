@@ -271,6 +271,7 @@ def main():
     
     best_val_metric = float('-inf')
     start_epoch = 0  # assume for fresh run
+    resume_wandb_id = None
 
     # resume training from checkpoint if --resume specified
     if resume_path is not None:
@@ -289,6 +290,9 @@ def main():
         start_epoch = ckpt['epoch']
         history = ckpt.get('history', history)
         best_val_metric = ckpt.get('best_val_metric', float('inf'))
+
+        # pull saved W&B run ID so we can resume the same chart on the cloud
+        resume_wandb_id = ckpt.get('wandb_run_id')
 
         # sanity: the scheduler's internal step count should equal
         # start_epoch * len(train_dataloader)
@@ -312,8 +316,27 @@ def main():
             f">>> Resuming at epoch {start_epoch + 1}/{num_epochs}, "
             f"best_val_metric so far = {best_val_metric:.4f}\n"
         )
+        if resume_wandb_id:
+            logger.info(f">>> Resuming W&B run id: {resume_wandb_id}")
+        logger.info("")
     else:
         logger.info(f"\nStarting fresh training for {num_epochs} epochs...")
+    
+    # initialize W&B run
+    wandb_run = init_wandb(cfg, results_dir, resume_run_id=resume_wandb_id)
+    if wandb_run is not None:
+        logger.info(
+            f"W&B run initialized: id={wandb_run.id}, "
+            f"mode={cfg['wandb'].get('mode', 'offline')}, "
+            f"dir={wandb_run.dir}"
+        )
+        # optionally watch the model (gradient histograms)
+        if cfg['wandb'].get('watch_model', False):
+            wandb.watch(
+                model,
+                log='gradients',
+                log_freq=cfg['wandb'].get('watch_log_freq', 100),
+            )
 
     best_path = models_dir / f'{checkpoint_prefix}_best.pth'
     latest_path = models_dir / f'{checkpoint_prefix}_latest.pth'
