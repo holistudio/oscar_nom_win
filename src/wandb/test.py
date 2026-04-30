@@ -217,6 +217,58 @@ def main():
         with open(results_path, 'w') as f:
             json.dump(results, f, indent=4)
         logger.info(f"\nTest dataset predictions saved to {results_path}")
+
+        if wandb_run is not None:
+            wandb.log({
+                "test/accuracy":  acc,
+                "test/precision": precision,
+                "test/recall":    recall,
+                "test/f1":        f1,
+                "test/macro_f1":  macro_f1,
+                "test/auc":       auc,
+            })
+
+            # W&B leaderboard summary metrics
+            wandb.run.summary["test/accuracy"]  = acc
+            wandb.run.summary["test/precision"] = precision
+            wandb.run.summary["test/recall"]    = recall
+            wandb.run.summary["test/f1"]        = f1
+            wandb.run.summary["test/macro_f1"]  = macro_f1
+            wandb.run.summary["test/auc"]       = auc
+
+            # W&B confusion matrix plot
+            wandb.log({
+                "test/confusion_matrix": wandb.plot.confusion_matrix(
+                    y_true=all_targets,
+                    preds=all_predictions,
+                    class_names=["Not Nominated", "Nominated"],
+                )
+            })
+
+            # W&B ROC curve
+            roc_probs = [[1.0 - p, p] for p in all_probabilities]
+            wandb.log({
+                "test/roc": wandb.plot.roc_curve(
+                    y_true=all_targets,
+                    y_probas=roc_probs,
+                    labels=["Not Nominated", "Nominated"],
+                )
+            })
+
+            # per-prediction table
+            pred_table = wandb.Table(
+                columns=["idx", "imdb_id", "target", "prediction", "prob_nominated", "correct"],
+                data=[[
+                    r["idx"],
+                    r["imdb_id"],
+                    r["target"],
+                    r["model_prediction"],
+                    r["model_prob"],
+                    int(r["target"] == r["model_prediction"]),
+                ] for r in results],
+            )
+            wandb.log({"test/predictions": pred_table})
+
     finally:
         if wandb_run is not None:
             wandb.finish()
