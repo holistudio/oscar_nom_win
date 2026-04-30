@@ -161,6 +161,7 @@ def main():
 
                 # Forward pass - get model predictions
                 logits = model(input_ids)
+                    logits = model(input_ids)
 
                 # Get predicted class (0 or 1)
                 predictions = torch.argmax(logits, dim=1)
