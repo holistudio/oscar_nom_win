@@ -501,6 +501,26 @@ def main():
                 json.dump(history, f, indent=2)
 
         logger.info("\nTraining complete!")
+
+        # W&B leaderboard summary metrics
+        if wandb_run is not None and len(history['train_loss']) > 0:
+            wandb.run.summary["best_val_f1"]  = max(history['val_f1'])
+
+            valid_aucs = [a for a in history['val_auc'] if not math.isnan(a)]
+            if valid_aucs:
+                wandb.run.summary["best_val_auc"] = max(valid_aucs)
+
+            wandb.run.summary["best_val_acc"]  = max(history['val_acc'])
+            wandb.run.summary["min_val_loss"]  = min(history['val_loss'])
+
+            # final-epoch metrics
+            wandb.run.summary["final_train_loss"] = history['train_loss'][-1]
+            wandb.run.summary["final_val_loss"]   = history['val_loss'][-1]
+            wandb.run.summary["epochs_completed"] = len(history['train_loss'])
+            
+            # model size
+            wandb.run.summary["total_params"]     = total_params
+            wandb.run.summary["trainable_params"] = trainable_params
     finally:
         # flush W&B even if exiting/crashing mid-training
         if wandb_run is not None:
