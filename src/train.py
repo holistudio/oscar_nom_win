@@ -5,10 +5,13 @@ import importlib
 from pathlib import Path
 import time
 import logging
+import math
 
 import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader, RandomSampler
+
+from sklearn.metrics import roc_auc_score, precision_recall_fscore_support
 
 from datasets import OscarScriptDataset
 
@@ -235,8 +238,11 @@ def main():
     grad_clip = training_cfg.get('grad_clip', 1.0)
 
     # training loop logging
-    history = {'train_loss': [], 'val_loss': [], 'train_acc': [], 'val_acc': []}
-    best_val_loss = float('inf')
+    history = {'train_loss': [], 'val_loss': [], 
+               'train_acc': [], 'val_acc': [],
+               'val_prec': [], 'val_rec': [], 'val_f1': [], 'val_auc': []}
+    
+    best_val_metric = float('-inf')
     start_epoch = 0  # assume for fresh run
 
     # resume training from checkpoint if --resume specified
@@ -255,7 +261,7 @@ def main():
         # 'epoch' should be 0-indexed start of the next epoch
         start_epoch = ckpt['epoch']
         history = ckpt.get('history', history)
-        best_val_loss = ckpt.get('best_val_loss', float('inf'))
+        best_val_metric = ckpt.get('best_val_metric', float('inf'))
 
         # sanity: the scheduler's internal step count should equal
         # start_epoch * len(train_dataloader)
@@ -277,7 +283,7 @@ def main():
 
         logger.info(
             f">>> Resuming at epoch {start_epoch + 1}/{num_epochs}, "
-            f"best_val_loss so far = {best_val_loss:.4f}\n"
+            f"best_val_metric so far = {best_val_metric:.4f}\n"
         )
     else:
         logger.info(f"\nStarting fresh training for {num_epochs} epochs...")
@@ -322,8 +328,9 @@ def main():
         # validation step
         model.eval()
         val_losses = []
-        val_correct = 0
-        val_total = 0
+        all_probs = []
+        all_preds = []
+        all_targets = []
         with torch.no_grad():
             for batch in val_dataloader:
                 input_ids = batch['input_ids'].to(device)
@@ -333,12 +340,29 @@ def main():
                 loss = criterion(logits, targets)
 
                 preds = torch.argmax(logits, dim=-1)
-                val_correct += (preds == targets).sum().item()
-                val_total += preds.shape[0]
+                probs = torch.softmax(logits, dim=-1)[:, 1]
+                
+                all_probs.extend(probs.cpu().tolist())
+                all_preds.extend(preds.cpu().tolist())
+                all_targets.extend(targets.cpu().tolist())
 
                 val_losses.append(loss.item())
+        # loss
         avg_val_loss = sum(val_losses) / len(val_losses)
-        avg_val_acc = val_correct / val_total
+
+        # accuracy
+        val_correct = sum(p == t for p, t in zip(all_preds, all_targets))
+        avg_val_acc = val_correct / len(all_targets)
+
+        # classification metrics
+        try:
+            val_auc = roc_auc_score(all_targets, all_probs)
+        except ValueError:
+            val_auc = float('nan')
+        
+        val_prec, val_rec, val_f1, _ = precision_recall_fscore_support(
+            all_targets, all_preds, labels=[1], average='binary', zero_division=0
+        )
 
         # log timing
         epoch_time = time.time() - epoch_start_time
@@ -352,6 +376,15 @@ def main():
         history['val_loss'].append(avg_val_loss)
         history['train_acc'].append(avg_train_acc)
         history['val_acc'].append(avg_val_acc)
+        history['val_auc'].append(float(val_auc))
+        history['val_prec'].append(float(val_prec))
+        history['val_rec'].append(float(val_rec))
+        history['val_f1'].append(float(val_f1))
+
+        # F1 score default metric for saving best checkpoint
+        # AUC is fallback metric when F1 is collapsed to 0, but is mapped to [-1, 0] range
+        # so that when F1 does improve, `if val_metric > best_val_metric:` still works below
+        val_metric = val_f1 if val_f1 > 0 else (val_auc - 1.0 if not math.isnan(val_auc) else -1.0)
 
         # build checkpoint payload once, reuse for latest and best models 
         ckpt_payload = {
@@ -361,7 +394,9 @@ def main():
             'scheduler_state_dict': scheduler.state_dict(),
             'train_loss': avg_train_loss,
             'val_loss': avg_val_loss,
-            'best_val_loss': best_val_loss,
+            'val_auc': float(val_auc),
+            'val_f1': float(val_f1),
+            'best_val_metric': best_val_metric,
             'history': history,
             'config': cfg,
         }
@@ -370,8 +405,8 @@ def main():
         torch.save(ckpt_payload, latest_path)
 
         # save best checkpoint when val loss improves
-        if avg_val_loss < best_val_loss:
-            best_val_loss = avg_val_loss
+        if val_metric > best_val_metric:
+            best_val_metric = val_metric
 
             torch.save(ckpt_payload, best_path)
             tail = " - New best! Model saved."
@@ -382,8 +417,10 @@ def main():
             f"Epoch [{epoch+1}/{num_epochs}] - Train Loss: {avg_train_loss:.4f}, "
             f"Val Loss: {avg_val_loss:.4f}, "
             f"Train Acc: {avg_train_acc*100:.1f}%, "
-            f"Val Acc: {avg_val_acc*100:.1f}% - Elapsed: {elapsed_str}, "
-            f"Avg/Epoch: {avg_time_str}{tail}"
+            f"Val Acc: {avg_val_acc*100:.1f}%"
+            f"Val AUC: {val_auc:.3f}, "
+            f"Val P/R/F1: {val_prec:.2f}/{val_rec:.2f}/{val_f1:.2f}"
+            f" - Elapsed: {elapsed_str}, Avg/Epoch: {avg_time_str}{tail}"
         )
 
         # save training history every epoch
