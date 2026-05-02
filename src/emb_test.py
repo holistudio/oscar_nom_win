@@ -1,6 +1,5 @@
 import argparse
 import json
-import pickle
 import importlib
 from pathlib import Path
 import logging
@@ -10,7 +9,7 @@ import torch.nn.functional as F
 from torch.utils.data import DataLoader
 from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, roc_auc_score
 
-from datasets import OscarScriptDataset
+from datasets import OscarEmbeddingDataset, emb_collate_fn
 
 import wandb
 
@@ -32,6 +31,13 @@ def build_model(model_cfg, device):
 
     model = ModelClass(model_cfg['params']).to(device)
     return model
+
+def model_forward(model, embeddings, key_padding_mask):
+    try:
+        return model(embeddings, src_key_padding_mask=key_padding_mask)
+    except TypeError:
+        return model(embeddings)
+
 
 def init_wandb(cfg, results_dir, train_run_id=None):
     """Initialize a W&B run for testing.
@@ -86,9 +92,8 @@ def evaluate_checkpoint(model, ckpt_path, test_dataloader, device,
             targets = batch['target'].to(device)
 
             with torch.amp.autocast(device_type='cuda', dtype=amp_dtype, enabled=use_amp):
-                logits = model(input_ids)
+                logits = model_forward(model, embeddings, kpm)
 
-            # cast logits back to fp32 for numerically clean softmax/argmax
             logits = logits.float()
 
             predictions = torch.argmax(logits, dim=1)
@@ -145,7 +150,7 @@ def evaluate_checkpoint(model, ckpt_path, test_dataloader, device,
 
 def main():
     # argument parsing
-    parser = argparse.ArgumentParser(description='Oscar nomination prediction model test evaluator')
+    parser = argparse.ArgumentParser(description='Oscar nomination prediction model test evaluator, embeddings input')
 
     parser.add_argument('--config', type=str, required=True,
                         help='Path to JSON config file')
@@ -206,12 +211,9 @@ def main():
     logger.info(f"Inference AMP: {'bfloat16' if use_amp else 'disabled (fp32)'}")
     logger.info(f"Test batch size: {args.test_batch_size}")
 
-    with open(data_cfg['test_path'], 'rb') as f:
-        test_items = pickle.load(f)
-
-    max_seq_len = model_cfg['params']['max_seq_len']
-    
-    test_dataset = OscarScriptDataset(test_items, max_length=max_seq_len)
+    embed_dir = data_cfg['embed_dir']
+    eager     = data_cfg.get('eager_load', True)
+    test_dataset = OscarEmbeddingDataset(embed_dir, split='test', eager=eager)
     test_dataloader = build_dataloaders(test_dataset, args.test_batch_size)
 
     # build the model once; we'll load each checkpoint's weights in turn
