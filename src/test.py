@@ -265,16 +265,16 @@ def main():
         return
 
     # -----------------------------------------------------------------
-    # Pick the best variant by composite score = AUC + macro-F1
+    # Pick the best variant by composite score = AUC only
     # Tie-break in CHECKPOINT_VARIANTS order.
     # -----------------------------------------------------------------
     composite_scores = {
-        v: out['metrics']['auc'] + out['metrics']['macro_f1']
+        v: out['metrics']['auc']
         for v, out in eval_outputs.items()
     }
 
     logger.info(f"\n{'='*60}")
-    logger.info("Composite score = AUC + macro-F1")
+    logger.info("Composite score = AUC only")
     logger.info(f"{'='*60}")
     for v in CHECKPOINT_VARIANTS:
         if v in composite_scores:
