@@ -1,6 +1,5 @@
 import argparse
 import json
-import pickle
 import importlib
 from pathlib import Path
 import time
@@ -13,36 +12,26 @@ from torch.utils.data import DataLoader, RandomSampler
 
 from sklearn.metrics import roc_auc_score, precision_recall_fscore_support
 
-from datasets import OscarScriptDataset
+from datasets import OscarEmbeddingDataset, emb_collate_fn
 
 import wandb
+
 
 def build_dataloaders(train_dataset, val_dataset, training_cfg, data_cfg, generator):
     bs = training_cfg['batch_size']
     subsample = data_cfg.get('subsample')
+    common = dict(collate_fn=emb_collate_fn, num_workers=0)
     if subsample:
-        train_sampler = RandomSampler(
-            train_dataset,
-            replacement=False,
-            num_samples=subsample['train_samples'],
-            generator=generator,
-        )
-        val_sampler = RandomSampler(
-            val_dataset,
-            replacement=False,
-            num_samples=subsample['val_samples'],
-            generator=generator,
-        )
-        train_dataloader = DataLoader(train_dataset, batch_size=bs,
-                                  sampler=train_sampler, num_workers=0)
-        val_dataloader = DataLoader(val_dataset, batch_size=bs,
-                                sampler=val_sampler, num_workers=0)
+        train_sampler = RandomSampler(train_dataset, replacement=False,
+                                      num_samples=subsample['train_samples'], generator=generator)
+        val_sampler   = RandomSampler(val_dataset, replacement=False,
+                                      num_samples=subsample['val_samples'], generator=generator)
+        train_dl = DataLoader(train_dataset, batch_size=bs, sampler=train_sampler, **common)
+        val_dl   = DataLoader(val_dataset,   batch_size=bs, sampler=val_sampler,   **common)
     else:
-        train_dataloader = DataLoader(train_dataset, batch_size=bs,
-                                      shuffle=True)
-        val_dataloader = DataLoader(val_dataset, batch_size=bs,
-                                    shuffle=True)
-    return train_dataloader, val_dataloader
+        train_dl = DataLoader(train_dataset, batch_size=bs, shuffle=True, **common)
+        val_dl   = DataLoader(val_dataset,   batch_size=bs, shuffle=True, **common)
+    return train_dl, val_dl
 
 def import_model_class(module_name, class_name):
     module = importlib.import_module(module_name)
@@ -129,11 +118,24 @@ def init_wandb(cfg, results_dir, resume_run_id=None):
     )
     return run
 
+
+def model_forward(model, embeddings, key_padding_mask):
+    """
+    Try to pass the padding mask through; fall back to plain call for
+    older signatures. The aggregator should accept it -- without the mask,
+    pad slots leak into the mean-pool and into self-attention.
+    """
+    try:
+        return model(embeddings, src_key_padding_mask=key_padding_mask)
+    except TypeError:
+        return model(embeddings)
+
+
 def main():
     # argument parsing
-    parser = argparse.ArgumentParser(description='Oscar nomination prediction model trainer')
-
-    parser.add_argument('--config', type=str, required=True,
+    parser = argparse.ArgumentParser(description='Oscar nomination prediction model trainer, ' \
+    'embeddings input')
+    parser.add_argument('--config', type=str, required=True, 
                         help='Path to JSON config file')
     parser.add_argument('--resume', dest='resume_path', nargs='?',
                         const='__AUTO__', default=None,
@@ -197,19 +199,14 @@ def main():
     logger.info(f'Device: {device}\n')
 
     # load data
-    with open(data_cfg['train_path'], 'rb') as f:
-        train_items = pickle.load(f)
-    with open(data_cfg['val_path'], 'rb') as f:
-        val_items = pickle.load(f)
+    embed_dir = data_cfg['embed_dir']
+    eager     = data_cfg.get('eager_load', True)
+    train_dataset = OscarEmbeddingDataset(embed_dir, split='train', eager=eager)
+    val_dataset   = OscarEmbeddingDataset(embed_dir, split='val',   eager=eager)
 
-    max_seq_len = model_cfg['params']['max_seq_len']
-    
-    train_dataset = OscarScriptDataset(train_items, max_length=max_seq_len)
-    val_dataset = OscarScriptDataset(val_items, max_length=max_seq_len)
+    train_dataloader, val_dataloader = build_dataloaders(
+        train_dataset, val_dataset, training_cfg, data_cfg, generator)
 
-    train_dataloader, val_dataloader = build_dataloaders(train_dataset, val_dataset,
-                                                         training_cfg, data_cfg, generator)
-    
     # define model
     model = build_model(model_cfg, device)
     total_params = sum(p.numel() for p in model.parameters())
@@ -388,12 +385,13 @@ def main():
             train_correct = 0
             train_total = 0
             for batch in train_dataloader:
-                input_ids = batch['input_ids'].to(device)
-                targets = batch['target'].to(device)
+                embeddings = batch['embeddings'].to(device)
+                kpm        = batch['key_padding_mask'].to(device)
+                targets    = batch['target'].to(device)
 
                 optimizer.zero_grad()
                 with torch.autocast(device_type=device.type, dtype=amp_dtype):
-                    logits = model(input_ids)
+                    logits = model_forward(model, embeddings, kpm)
                     loss = criterion(logits, targets)
                 loss.backward()
                 
@@ -418,16 +416,17 @@ def main():
             all_targets = []
             with torch.no_grad():
                 for batch in val_dataloader:
-                    input_ids = batch['input_ids'].to(device)
-                    targets = batch['target'].to(device)
+                    embeddings = batch['embeddings'].to(device)
+                    kpm        = batch['key_padding_mask'].to(device)
+                    targets    = batch['target'].to(device)
 
                     with torch.autocast(device_type=device.type, dtype=amp_dtype):
-                        logits = model(input_ids)
+                        logits = model_forward(model, embeddings, kpm)
                         loss = criterion(logits, targets)
 
                     preds = torch.argmax(logits, dim=-1)
-                    probs = torch.softmax(logits, dim=-1)[:, 1]
-                    
+                    probs = torch.softmax(logits.float(), dim=-1)[:, 1]
+
                     all_probs.extend(probs.cpu().tolist())
                     all_preds.extend(preds.cpu().tolist())
                     all_targets.extend(targets.cpu().tolist())
