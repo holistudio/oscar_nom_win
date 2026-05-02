@@ -269,8 +269,15 @@ def main():
                'train_acc': [], 'val_acc': [],
                'val_prec': [], 'val_rec': [], 'val_f1': [], 'val_auc': []}
     
-    # selection metric is AUC on validation dataset
-    best_val_metric = float('-inf')
+    # track three independent selection metrics
+    # each gets its own checkpoint
+    best_val_auc = float('-inf')
+    best_val_f1 = float('-inf')
+    min_val_loss = float('inf')
+    best_auc_epoch = -1
+    best_f1_epoch = -1
+    best_loss_epoch = -1
+
     start_epoch = 0  # assume for fresh run
     resume_wandb_id = None
 
@@ -290,7 +297,27 @@ def main():
         # 'epoch' should be 0-indexed start of the next epoch
         start_epoch = ckpt['epoch']
         history = ckpt.get('history', history)
-        best_val_metric = ckpt.get('best_val_metric', float('inf'))
+
+        # restore all three best-metric trackers; fall back to history if missing
+        # (e.g. resuming from an older single-metric checkpoint)
+        best_val_auc = ckpt.get('best_val_auc', float('-inf'))
+        best_val_f1 = ckpt.get('best_val_f1', float('-inf'))
+        min_val_loss = ckpt.get('min_val_loss', float('inf'))
+        best_auc_epoch = ckpt.get('best_auc_epoch', -1)
+        best_f1_epoch = ckpt.get('best_f1_epoch', -1)
+        best_loss_epoch = ckpt.get('best_loss_epoch', -1)
+
+        if best_val_auc == float('-inf') and history.get('val_auc'):
+            valid_aucs = [a for a in history['val_auc'] if not math.isnan(a)]
+            if valid_aucs:
+                best_val_auc = max(valid_aucs)
+                best_auc_epoch = history['val_auc'].index(best_val_auc) + 1
+        if best_val_f1 == float('-inf') and history.get('val_f1'):
+            best_val_f1 = max(history['val_f1'])
+            best_f1_epoch = history['val_f1'].index(best_val_f1) + 1
+        if min_val_loss == float('inf') and history.get('val_loss'):
+            min_val_loss = min(history['val_loss'])
+            best_loss_epoch = history['val_loss'].index(min_val_loss) + 1
 
         # pull saved W&B run ID so we can resume the same chart on the cloud
         resume_wandb_id = ckpt.get('wandb_run_id')
@@ -314,8 +341,10 @@ def main():
             return
 
         logger.info(
-            f">>> Resuming at epoch {start_epoch + 1}/{num_epochs}, "
-            f"best_val_metric so far = {best_val_metric:.4f}\n"
+            f">>> Resuming at epoch {start_epoch + 1}/{num_epochs}\n"
+            f"    best AUC so far  = {best_val_auc:.4f} (epoch {best_auc_epoch})\n"
+            f"    best F1 so far   = {best_val_f1:.4f} (epoch {best_f1_epoch})\n"
+            f"    min loss so far  = {min_val_loss:.4f} (epoch {best_loss_epoch})\n"
         )
         if resume_wandb_id:
             logger.info(f">>> Resuming W&B run id: {resume_wandb_id}")
@@ -339,8 +368,11 @@ def main():
                 log_freq=cfg['wandb'].get('watch_log_freq', 100),
             )
 
-    best_path = models_dir / f'{checkpoint_prefix}_best.pth'
+    # checkpoint paths: latest + three independent "best" checkpoints
     latest_path = models_dir / f'{checkpoint_prefix}_latest.pth'
+    best_auc_path = models_dir / f'{checkpoint_prefix}_best_auc.pth'
+    best_f1_path = models_dir / f'{checkpoint_prefix}_best_f1.pth'
+    best_loss_path = models_dir / f'{checkpoint_prefix}_best_loss.pth'
 
     training_start_time = time.time()
     epoch_times = []
@@ -435,10 +467,23 @@ def main():
             history['val_rec'].append(float(val_rec))
             history['val_f1'].append(float(val_f1))
 
-            # AUC is the checkpoint selection metric 
-            val_metric = float(val_auc) if not math.isnan(val_auc) else -1.0
+            # determine which (if any) of the three best metrics improved this epoch
+            val_auc_safe = float(val_auc) if not math.isnan(val_auc) else float('-inf')
+            new_best_auc = val_auc_safe > best_val_auc
+            new_best_f1 = float(val_f1) > best_val_f1
+            new_best_loss = float(avg_val_loss) < min_val_loss
 
-            # build checkpoint payload once, reuse for latest and best models 
+            if new_best_auc:
+                best_val_auc = val_auc_safe
+                best_auc_epoch = epoch + 1
+            if new_best_f1:
+                best_val_f1 = float(val_f1)
+                best_f1_epoch = epoch + 1
+            if new_best_loss:
+                min_val_loss = float(avg_val_loss)
+                best_loss_epoch = epoch + 1
+
+            # build checkpoint payload once, reuse for latest + any best-saves
             ckpt_payload = {
                 'epoch': epoch + 1, # 1-indexed: epoch that just finished
                 'model_state_dict': model.state_dict(),
@@ -448,7 +493,12 @@ def main():
                 'val_loss': avg_val_loss,
                 'val_auc': float(val_auc),
                 'val_f1': float(val_f1),
-                'best_val_metric': best_val_metric,
+                'best_val_auc': best_val_auc,
+                'best_val_f1': best_val_f1,
+                'min_val_loss': min_val_loss,
+                'best_auc_epoch': best_auc_epoch,
+                'best_f1_epoch': best_f1_epoch,
+                'best_loss_epoch': best_loss_epoch,
                 'history': history,
                 'config': cfg,
                 'wandb_run_id': wandb_run.id if wandb_run is not None else None,
@@ -457,16 +507,22 @@ def main():
             # save latest checkpoint
             torch.save(ckpt_payload, latest_path)
 
-            # save best checkpoint when AUC improves
-            if val_metric > best_val_metric:
-                best_val_metric = val_metric
+            # save best checkpoints (one per metric that improved this epoch)
+            saved_tags = []
+            if new_best_auc:
+                torch.save(ckpt_payload, best_auc_path)
+                saved_tags.append('AUC')
+            if new_best_f1:
+                torch.save(ckpt_payload, best_f1_path)
+                saved_tags.append('F1')
+            if new_best_loss:
+                torch.save(ckpt_payload, best_loss_path)
+                saved_tags.append('LOSS')
 
-                torch.save(ckpt_payload, best_path)
-                tail = " - New best! Model saved."
-                new_best = True
+            if saved_tags:
+                tail = f" - New best ({'/'.join(saved_tags)})! Model saved."
             else:
                 tail = ""
-                new_best = False
 
             logger.info(
                 f"Epoch [{epoch+1}/{num_epochs}] - Train Loss: {avg_train_loss:.4f}, "
@@ -490,8 +546,12 @@ def main():
                     "val/f1":          float(val_f1),
                     "lr":              scheduler.get_last_lr()[0],
                     "epoch_time_sec":  epoch_time,
-                    "best_val_metric": best_val_metric,
-                    "new_best":        int(new_best),
+                    "best_val_auc":    best_val_auc,
+                    "best_val_f1":     best_val_f1,
+                    "min_val_loss":    min_val_loss,
+                    "new_best_auc":    int(new_best_auc),
+                    "new_best_f1":     int(new_best_f1),
+                    "new_best_loss":   int(new_best_loss),
                 }, step=epoch + 1)
 
             # save training history every epoch
@@ -501,17 +561,29 @@ def main():
                 json.dump(history, f, indent=2)
 
         logger.info("\nTraining complete!")
+        logger.info(
+            f"  Best AUC:  {best_val_auc:.4f} (epoch {best_auc_epoch}) -> {best_auc_path.name}"
+        )
+        logger.info(
+            f"  Best F1:   {best_val_f1:.4f} (epoch {best_f1_epoch}) -> {best_f1_path.name}"
+        )
+        logger.info(
+            f"  Min Loss:  {min_val_loss:.4f} (epoch {best_loss_epoch}) -> {best_loss_path.name}"
+        )
 
         # W&B leaderboard summary metrics
         if wandb_run is not None and len(history['train_loss']) > 0:
-            wandb.run.summary["best_val_f1"]  = max(history['val_f1'])
+            wandb.run.summary["best_val_f1"]  = best_val_f1
+            wandb.run.summary["best_val_f1_epoch"] = best_f1_epoch
 
-            valid_aucs = [a for a in history['val_auc'] if not math.isnan(a)]
-            if valid_aucs:
-                wandb.run.summary["best_val_auc"] = max(valid_aucs)
+            if best_val_auc != float('-inf'):
+                wandb.run.summary["best_val_auc"] = best_val_auc
+                wandb.run.summary["best_val_auc_epoch"] = best_auc_epoch
 
-            wandb.run.summary["best_val_acc"]  = max(history['val_acc'])
-            wandb.run.summary["min_val_loss"]  = min(history['val_loss'])
+            wandb.run.summary["min_val_loss"] = min_val_loss
+            wandb.run.summary["min_val_loss_epoch"] = best_loss_epoch
+
+            wandb.run.summary["best_val_acc"] = max(history['val_acc'])
 
             # final-epoch metrics
             wandb.run.summary["final_train_loss"] = history['train_loss'][-1]
