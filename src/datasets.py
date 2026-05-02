@@ -87,6 +87,7 @@ class OscarEmbeddingDataset(Dataset):
         num_tokens    : scalar int
     """
     def __init__(self, embed_dir, split, eager=False):
+        logger.info("\nInitializing screenplay embeddings into Datasets...")
         self.embed_dir = Path(embed_dir)
         self.split = split
         with open(self.embed_dir / f"{split}_manifest.json", "r") as f:
@@ -96,6 +97,7 @@ class OscarEmbeddingDataset(Dataset):
         self._cache = None
         if eager:
             # ~130MB total across all splits — fine on a 4090 host
+            logger.info("Loading screenplay embeddings into Datasets...")
             self._cache = [self._load(i) for i in range(len(self.manifest))]
 
     def _load(self, idx):
