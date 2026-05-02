@@ -192,3 +192,4 @@ cython_debug/
 /results
 /.vscode
 /src/wandb
+/src/gpt2_embed
