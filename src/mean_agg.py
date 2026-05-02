@@ -15,7 +15,7 @@ class OscarNomAgg(nn.Module):
             self.agg_proj = nn.Linear(cfg['enc_d_model'], cfg['agg_d_model'])
         else:
             self.agg_proj = nn.Identity()
-        self.max_chunks = cfg['max_seq_len'] // cfg['chunk_size'] + 1
+        self.max_chunks = (cfg['max_seq_len'] + cfg['chunk_size'] - 1) // cfg['chunk_size']
         self.agg_pos_emb = nn.Embedding(self.max_chunks, cfg['agg_d_model'])
         self.agg_drop_emb = nn.Dropout(cfg['dropout'])
 
@@ -63,21 +63,12 @@ class OscarNomAgg(nn.Module):
         Apply scaled initialization to residual projection layers.
         Following GPT-2, scale by 1/sqrt(2*num_layers) for stability in deep networks.
         """
-        total_layers = self.enc_num_layers + self.agg_num_layers
-
-        # Scale residual projections in encoder layers
-        for layer in self.enc_trf_blocks.layers:
-            # Scale the second linear layer in the feedforward network (residual projection)
-            torch.nn.init.normal_(layer.linear2.weight, mean=0.0, std=0.02/math.sqrt(2 * total_layers))
-            # Scale the output projection in multi-head attention
-            torch.nn.init.normal_(layer.self_attn.out_proj.weight, mean=0.0, std=0.02/math.sqrt(2 * total_layers))
-
         # Scale residual projections in aggregator layers
         for layer in self.agg_trf_blocks.layers:
             # Scale the second linear layer in the feedforward network (residual projection)
-            torch.nn.init.normal_(layer.linear2.weight, mean=0.0, std=0.02/math.sqrt(2 * total_layers))
+            torch.nn.init.normal_(layer.linear2.weight, mean=0.0, std=0.02/math.sqrt(2 * self.agg_num_layers))
             # Scale the output projection in multi-head attention
-            torch.nn.init.normal_(layer.self_attn.out_proj.weight, mean=0.0, std=0.02/math.sqrt(2 * total_layers))
+            torch.nn.init.normal_(layer.self_attn.out_proj.weight, mean=0.0, std=0.02/math.sqrt(2 * self.agg_num_layers))
 
     def forward(self, src):
         batch_size, num_chunks, enc_d_model = src.shape
@@ -117,8 +108,8 @@ if __name__ == '__main__':
     model = OscarNomAgg(config).to(device)
 
     batch_size = 2
-    src_seq_len = 106578
-    src = torch.randint(0, config['enc_d_model'], (batch_size, src_seq_len)).to(device)
+    num_chunks = (config['max_seq_len'] + config['chunk_size'] - 1) // config['chunk_size']
+    src = torch.randn(batch_size, num_chunks, config['enc_d_model']).to(device)
 
     print(f"Model parameters: {sum(p.numel() for p in model.parameters()):,}")
     print(f"Source shape: {src.shape}")
