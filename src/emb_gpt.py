@@ -1,7 +1,6 @@
 import math
 import os
 import json
-import tensorflow as tf
 
 import numpy as np
 
@@ -170,10 +169,10 @@ class GPTEmbedModel(nn.Module):
     def _load_weights_into_gpt(self, params):
         def assign(left, right):
             if left.shape != right.shape:
-                raise ValueError(f"Shape mismatch. Left: {left.shape}, "
-                                "Right: {right.shape}"
+                raise ValueError(
+                    f"Shape mismatch. Left: {left.shape}, Right: {right.shape}"
                 )
-            return torch.nn.Parameter(torch.tensor(right))
+            return torch.nn.Parameter(torch.as_tensor(right))
         
         # set token and positional embedding weights
         self.pos_emb.weight = assign(self.pos_emb.weight, params['wpe'])
