@@ -14,6 +14,9 @@ from datasets import OscarScriptDataset
 
 import wandb
 
+# the three best-checkpoint variants saved by train.py
+CHECKPOINT_VARIANTS = ['best_auc', 'best_f1', 'best_loss']
+
 def build_dataloaders(test_dataset, batch_size):
     test_dataloader = DataLoader(test_dataset,
                                  batch_size=batch_size,
@@ -58,6 +61,87 @@ def init_wandb(cfg, results_dir, train_run_id=None):
         job_type="test",
     )
     return run
+
+def evaluate_checkpoint(model, ckpt_path, test_dataloader, device,
+                        use_amp, amp_dtype, batch_size, logger):
+    """Load a checkpoint into `model`, run inference on the test set,
+    return a dict of metrics + per-sample results."""
+    checkpoint = torch.load(ckpt_path, map_location=device)
+    model.load_state_dict(checkpoint['model_state_dict'])
+    logger.info(f"Loaded weights from {ckpt_path.name}")
+
+    model.eval()
+
+    correct = 0
+    total = 0
+    all_predictions = []
+    all_targets = []
+    all_probabilities = []
+    results = []
+
+    with torch.no_grad():
+        for batch_idx, batch in enumerate(test_dataloader):
+            imdb_ids = batch['imdb_id']
+            input_ids = batch['input_ids'].to(device)
+            targets = batch['target'].to(device)
+
+            with torch.amp.autocast(device_type='cuda', dtype=amp_dtype, enabled=use_amp):
+                logits = model(input_ids)
+
+            # cast logits back to fp32 for numerically clean softmax/argmax
+            logits = logits.float()
+
+            predictions = torch.argmax(logits, dim=1)
+            probabilities = F.softmax(logits, dim=1)[:, 1]
+
+            correct += (predictions == targets).sum().item()
+            total += targets.size(0)
+
+            preds_list = predictions.cpu().numpy().tolist()
+            targets_list = targets.cpu().numpy().tolist()
+            probs_list = probabilities.cpu().numpy().tolist()
+
+            all_predictions.extend(preds_list)
+            all_targets.extend(targets_list)
+            all_probabilities.extend(probs_list)
+
+            for i in range(len(targets_list)):
+                sample_idx = batch_idx * batch_size + i
+                results.append({
+                    "idx": sample_idx,
+                    "imdb_id": imdb_ids[i],
+                    "target": targets_list[i],
+                    "model_prediction": preds_list[i],
+                    "model_prob": round(probs_list[i], 6)
+                })
+
+            if (batch_idx + 1) % 10 == 0:
+                logger.info(f"  Processed {batch_idx + 1}/{len(test_dataloader)} batches")
+
+    acc       = accuracy_score(all_targets, all_predictions)
+    precision = precision_score(all_targets, all_predictions, average='binary', pos_label=1, zero_division=0)
+    recall    = recall_score(all_targets, all_predictions, average='binary', pos_label=1, zero_division=0)
+    f1        = f1_score(all_targets, all_predictions, average='binary', pos_label=1, zero_division=0)
+    macro_f1  = f1_score(all_targets, all_predictions, average='macro', zero_division=0)
+    auc       = roc_auc_score(all_targets, all_probabilities)
+
+    return {
+        'metrics': {
+            'accuracy':  acc,
+            'precision': precision,
+            'recall':    recall,
+            'f1':        f1,
+            'macro_f1':  macro_f1,
+            'auc':       auc,
+            'correct':   correct,
+            'total':     total,
+        },
+        'all_targets':       all_targets,
+        'all_predictions':   all_predictions,
+        'all_probabilities': all_probabilities,
+        'results':           results,
+        'wandb_run_id':      checkpoint.get('wandb_run_id'),
+    }
 
 def main():
     # argument parsing
@@ -130,148 +214,153 @@ def main():
     test_dataset = OscarScriptDataset(test_items, max_length=max_seq_len)
     test_dataloader = build_dataloaders(test_dataset, args.test_batch_size)
 
-    # define model
-    
+    # build the model once; we'll load each checkpoint's weights in turn
     model = build_model(model_cfg, device)
-    best_path = models_dir / f'{checkpoint_prefix}_best.pth'
-    checkpoint = torch.load(best_path, map_location=device)
-    model.load_state_dict(checkpoint['model_state_dict'])
-    logger.info(f"Model weights loaded successfully { best_path}!")
-    
     total_params = sum(p.numel() for p in model.parameters())
-    logger.info(f"Total model parameters: {total_params:,}")
+    logger.info(f"Total model parameters: {total_params:,}\n")
 
-    # pull the W&B run id from the checkpoint so tie the test to
-    # same W&B run as training, unless --new-wandb-run was passed
-    train_run_id = None if args.new_wandb_run else checkpoint.get('wandb_run_id')
+    # -----------------------------------------------------------------
+    # Evaluate each checkpoint variant in turn.
+    # -----------------------------------------------------------------
+    eval_outputs = {}        # variant -> evaluate_checkpoint() return dict
+    missing_variants = []
+    train_run_id = None      # grabbed from whichever checkpoint loads first
 
-    # initialize W&B
+    for variant in CHECKPOINT_VARIANTS:
+        ckpt_path = models_dir / f'{checkpoint_prefix}_{variant}.pth'
+        if not ckpt_path.exists():
+            logger.warning(f"Checkpoint not found, skipping: {ckpt_path}")
+            missing_variants.append(variant)
+            continue
+
+        logger.info(f"\n{'='*60}")
+        logger.info(f"Evaluating variant: {variant}")
+        logger.info(f"{'='*60}")
+
+        out = evaluate_checkpoint(
+            model, ckpt_path, test_dataloader, device,
+            use_amp, amp_dtype, args.test_batch_size, logger,
+        )
+        eval_outputs[variant] = out
+
+        if train_run_id is None and out['wandb_run_id'] is not None:
+            train_run_id = out['wandb_run_id']
+
+        m = out['metrics']
+        logger.info(
+            f"  [{variant}] Acc={m['accuracy']*100:.2f}%  "
+            f"P={m['precision']*100:.2f}%  R={m['recall']*100:.2f}%  "
+            f"F1={m['f1']*100:.2f}%  macro-F1={m['macro_f1']*100:.2f}%  "
+            f"AUC={m['auc']:.4f}"
+        )
+
+        # save per-variant predictions JSON
+        results_path = results_dir / f"{checkpoint_prefix}_{variant}_test_results.json"
+        with open(results_path, 'w') as f:
+            json.dump(out['results'], f, indent=4)
+        logger.info(f"  Predictions saved to {results_path}")
+
+    if not eval_outputs:
+        logger.error("No checkpoints found to evaluate. Exiting.")
+        return
+
+    # -----------------------------------------------------------------
+    # Pick the best variant by composite score = AUC + macro-F1
+    # Tie-break in CHECKPOINT_VARIANTS order.
+    # -----------------------------------------------------------------
+    composite_scores = {
+        v: out['metrics']['auc'] + out['metrics']['macro_f1']
+        for v, out in eval_outputs.items()
+    }
+
+    logger.info(f"\n{'='*60}")
+    logger.info("Composite score = AUC + macro-F1")
+    logger.info(f"{'='*60}")
+    for v in CHECKPOINT_VARIANTS:
+        if v in composite_scores:
+            logger.info(f"  {v:10s}: {composite_scores[v]:.4f}")
+
+    # argmax with deterministic tie-break: iterate in CHECKPOINT_VARIANTS order
+    best_variant = max(
+        (v for v in CHECKPOINT_VARIANTS if v in composite_scores),
+        key=lambda v: composite_scores[v],
+    )
+    best_out = eval_outputs[best_variant]
+    best_metrics = best_out['metrics']
+    best_composite = composite_scores[best_variant]
+
+    logger.info(f"\n{'='*60}")
+    logger.info(f"BEST variant: {best_variant}  (composite={best_composite:.4f})")
+    logger.info(f"{'='*60}")
+    logger.info(f"  Accuracy:   {best_metrics['accuracy'] * 100:.2f}%")
+    logger.info(f"  Precision:  {best_metrics['precision'] * 100:.2f}%")
+    logger.info(f"  Recall:     {best_metrics['recall'] * 100:.2f}%")
+    logger.info(f"  F1:         {best_metrics['f1'] * 100:.2f}%")
+    logger.info(f"  Macro-F1:   {best_metrics['macro_f1'] * 100:.2f}%")
+    logger.info(f"  AUC:        {best_metrics['auc']:.4f}")
+    logger.info(f"{'='*60}")
+
+    # -----------------------------------------------------------------
+    # W&B logging: report ONLY the best variant.
+    # -----------------------------------------------------------------
+    train_run_id = None if args.new_wandb_run else train_run_id
     wandb_run = init_wandb(cfg, results_dir, train_run_id=train_run_id)
+
     if wandb_run is not None:
         if train_run_id:
             logger.info(f"W&B: continuing run id={wandb_run.id} for test logging")
         else:
             logger.info(f"W&B: started fresh test run id={wandb_run.id}")
 
-    logger.info("Evaluating model on test set...")
-    model.eval()
-
-    correct = 0
-    total = 0
-    all_predictions = []
-    all_targets = []
-    all_probabilities = []  # store probabilities for ROC curve
-    results = []
-
-    try:
-        with torch.no_grad():
-            for batch_idx, batch in enumerate(test_dataloader):
-                imdb_ids = batch['imdb_id']
-                # Move data to device
-                input_ids = batch['input_ids'].to(device)
-                targets = batch['target'].to(device)
-
-                # Forward pass - get model predictions
-                with torch.amp.autocast(device_type='cuda', dtype=amp_dtype, enabled=use_amp):
-                    logits = model(input_ids)
-
-                # cast logits back to fp32 for numerically clean softmax/argmax
-                logits = logits.float()
-
-                # Get predicted class (0 or 1)
-                predictions = torch.argmax(logits, dim=1)
-
-                # Get probabilities for positive class (nominated = 1)
-                probabilities = F.softmax(logits, dim=1)[:, 1]  # Probability of class 1
-
-                # Update accuracy metrics
-                correct += (predictions == targets).sum().item()
-                total += targets.size(0)
-
-                # Store predictions, targets, and probabilities
-                preds_list = predictions.cpu().numpy().tolist()
-                targets_list = targets.cpu().numpy().tolist()
-                probs_list = probabilities.cpu().numpy().tolist()
-
-                all_predictions.extend(preds_list)
-                all_targets.extend(targets_list)
-                all_probabilities.extend(probs_list)
-
-                for i in range(len(targets_list)):
-                    sample_idx = batch_idx * args.test_batch_size + i
-                    results.append({
-                        "idx": sample_idx,
-                        "imdb_id": imdb_ids[i],
-                        "target": targets_list[i],
-                        "model_prediction": preds_list[i],
-                        "model_prob": round(probs_list[i], 6)
-                    })
-
-                if (batch_idx + 1) % 10 == 0:
-                    logger.info(f"  Processed {batch_idx + 1}/{len(test_dataloader)} batches")
-
-        acc       = accuracy_score(all_targets, all_predictions)
-        precision = precision_score(all_targets, all_predictions, average='binary', pos_label=1)
-        recall    = recall_score(all_targets, all_predictions, average='binary', pos_label=1)
-        f1        = f1_score(all_targets, all_predictions, average='binary', pos_label=1)
-        macro_f1  = f1_score(all_targets, all_predictions, average='macro')
-        auc       = roc_auc_score(all_targets, all_probabilities)
-
-        logger.info(f"\n{'='*60}")
-        logger.info(f"Test Results ({correct}/{total} correct)")
-        logger.info(f"{'='*60}")
-        logger.info(f"  Accuracy:   {acc * 100:.2f}%")
-        logger.info(f"  Precision:  {precision * 100:.2f}%")
-        logger.info(f"  Recall:     {recall * 100:.2f}%")
-        logger.info(f"  F1:         {f1 * 100:.2f}%")
-        logger.info(f"  Macro-F1:   {macro_f1 * 100:.2f}%")
-        logger.info(f"  AUC:        {auc:.4f}")
-        logger.info(f"{'='*60}")
-
-        # save results JSON to same directory as model checkpoint
-        results_path = results_dir / f"{checkpoint_prefix}_test_results.json"
-        with open(results_path, 'w') as f:
-            json.dump(results, f, indent=4)
-        logger.info(f"\nTest dataset predictions saved to {results_path}")
-
-        if wandb_run is not None:
+        try:
+            # record which variant won + composite + all variant composites for context
             wandb.log({
-                "test/accuracy":  acc,
-                "test/precision": precision,
-                "test/recall":    recall,
-                "test/f1":        f1,
-                "test/macro_f1":  macro_f1,
-                "test/auc":       auc,
+                "test/best_variant":   best_variant,
+                "test/composite":      best_composite,
+                "test/accuracy":       best_metrics['accuracy'],
+                "test/precision":      best_metrics['precision'],
+                "test/recall":         best_metrics['recall'],
+                "test/f1":             best_metrics['f1'],
+                "test/macro_f1":       best_metrics['macro_f1'],
+                "test/auc":            best_metrics['auc'],
             })
 
-            # W&B leaderboard summary metrics
-            wandb.run.summary["test/accuracy"]  = acc
-            wandb.run.summary["test/precision"] = precision
-            wandb.run.summary["test/recall"]    = recall
-            wandb.run.summary["test/f1"]        = f1
-            wandb.run.summary["test/macro_f1"]  = macro_f1
-            wandb.run.summary["test/auc"]       = auc
+            # also log every variant's composite so you can see the spread on W&B
+            for v, score in composite_scores.items():
+                wandb.log({f"test/composite_{v}": score})
 
-            # W&B confusion matrix plot
+            # W&B leaderboard summary metrics
+            wandb.run.summary["test/best_variant"] = best_variant
+            wandb.run.summary["test/composite"]    = best_composite
+            wandb.run.summary["test/accuracy"]     = best_metrics['accuracy']
+            wandb.run.summary["test/precision"]    = best_metrics['precision']
+            wandb.run.summary["test/recall"]       = best_metrics['recall']
+            wandb.run.summary["test/f1"]           = best_metrics['f1']
+            wandb.run.summary["test/macro_f1"]     = best_metrics['macro_f1']
+            wandb.run.summary["test/auc"]          = best_metrics['auc']
+            if missing_variants:
+                wandb.run.summary["test/missing_variants"] = ",".join(missing_variants)
+
+            # confusion matrix for the best variant
             wandb.log({
                 "test/confusion_matrix": wandb.plot.confusion_matrix(
-                    y_true=all_targets,
-                    preds=all_predictions,
+                    y_true=best_out['all_targets'],
+                    preds=best_out['all_predictions'],
                     class_names=["Not Nominated", "Nominated"],
                 )
             })
 
-            # W&B ROC curve
-            roc_probs = [[1.0 - p, p] for p in all_probabilities]
+            # ROC curve for the best variant
+            roc_probs = [[1.0 - p, p] for p in best_out['all_probabilities']]
             wandb.log({
                 "test/roc": wandb.plot.roc_curve(
-                    y_true=all_targets,
+                    y_true=best_out['all_targets'],
                     y_probas=roc_probs,
                     labels=["Not Nominated", "Nominated"],
                 )
             })
 
-            # per-prediction table
+            # per-prediction table for the best variant
             pred_table = wandb.Table(
                 columns=["idx", "imdb_id", "target", "prediction", "prob_nominated", "correct"],
                 data=[[
@@ -281,12 +370,29 @@ def main():
                     r["model_prediction"],
                     r["model_prob"],
                     int(r["target"] == r["model_prediction"]),
-                ] for r in results],
+                ] for r in best_out['results']],
             )
             wandb.log({"test/predictions": pred_table})
 
-    finally:
-        if wandb_run is not None:
+            # small comparison table across all evaluated variants
+            variant_table = wandb.Table(
+                columns=["variant", "composite", "accuracy", "auc", "f1",
+                         "macro_f1", "precision", "recall", "is_best"],
+                data=[[
+                    v,
+                    composite_scores[v],
+                    eval_outputs[v]['metrics']['accuracy'],
+                    eval_outputs[v]['metrics']['auc'],
+                    eval_outputs[v]['metrics']['f1'],
+                    eval_outputs[v]['metrics']['macro_f1'],
+                    eval_outputs[v]['metrics']['precision'],
+                    eval_outputs[v]['metrics']['recall'],
+                    int(v == best_variant),
+                ] for v in CHECKPOINT_VARIANTS if v in eval_outputs],
+            )
+            wandb.log({"test/variant_comparison": variant_table})
+
+        finally:
             wandb.finish()
 
 if __name__ == "__main__":
