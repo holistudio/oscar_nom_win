@@ -17,9 +17,8 @@ import wandb
 CHECKPOINT_VARIANTS = ['best_auc', 'best_f1', 'best_loss']
 
 def build_dataloaders(test_dataset, batch_size):
-    test_dataloader = DataLoader(test_dataset,
-                                 batch_size=batch_size,
-                                 shuffle=False, num_workers=2)
+    test_dataloader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False,
+                      num_workers=2, collate_fn=emb_collate_fn)
     return test_dataloader
 
 def import_model_class(module_name, class_name):
@@ -87,9 +86,10 @@ def evaluate_checkpoint(model, ckpt_path, test_dataloader, device,
 
     with torch.no_grad():
         for batch_idx, batch in enumerate(test_dataloader):
-            imdb_ids = batch['imdb_id']
-            input_ids = batch['input_ids'].to(device)
-            targets = batch['target'].to(device)
+            imdb_ids   = batch['imdb_id']
+            embeddings = batch['embeddings'].to(device)
+            kpm        = batch['key_padding_mask'].to(device)
+            targets    = batch['target'].to(device)
 
             with torch.amp.autocast(device_type='cuda', dtype=amp_dtype, enabled=use_amp):
                 logits = model_forward(model, embeddings, kpm)
