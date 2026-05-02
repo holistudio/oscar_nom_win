@@ -38,7 +38,6 @@ from pathlib import Path
 
 import numpy as np
 import torch
-from torch.utils.data import DataLoader
 
 import tensorflow as tf
 from gpt_download import load_gpt2_params_from_tf_ckpt
