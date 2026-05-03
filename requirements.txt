@@ -11,5 +11,7 @@ ipykernel
 tqdm
 ipywidgets
 tensorflow
+nltk
+wordcloud
 
 wandb
