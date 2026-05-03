@@ -13,5 +13,6 @@ ipywidgets
 tensorflow
 nltk
 wordcloud
+wordfreq
 
 wandb
