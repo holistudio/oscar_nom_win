@@ -115,14 +115,15 @@ for split_name, df in SPLITS:
         eta_seconds = avg_t * n_remaining
         eta_timestamp = datetime.datetime.now() + datetime.timedelta(seconds=eta_seconds)
 
-        print(f"[{split_name}:{idx}] {row['movie_name']}")
-        print(f"  nominated={row['nominated']}  winner={row['winner']}")
-        print(f"  token_count={len(tokens)}")
-        print(f"  first 10 tokens: {tokens[:10]}")
-        print(f"  time this script : {t_elapsed:.2f}s")
-        print(f"  avg time/script  : {avg_t:.2f}s  ({n_processed_global}/{N_TOTAL_GLOBAL} processed globally)")
-        print(f"  ETA full dataset : {eta_seconds/60:.1f} min  (done ~{eta_timestamp.strftime('%H:%M:%S')})")
-        print()
+        if idx % 100 == 0:
+            print(f"[{split_name}:{idx}] {row['movie_name']}")
+            print(f"  nominated={row['nominated']}  winner={row['winner']}")
+            print(f"  token_count={len(tokens)}")
+            print(f"  first 10 tokens: {tokens[:10]}")
+            print(f"  time this script : {t_elapsed:.2f}s")
+            print(f"  avg time/script  : {avg_t:.2f}s  ({n_processed_global}/{N_TOTAL_GLOBAL} processed globally)")
+            print(f"  ETA full dataset : {eta_seconds/60:.1f} min  (done ~{eta_timestamp.strftime('%H:%M:%S')})")
+            print()
 
     # --- Save split results ---
     df_results = pd.DataFrame(results)
