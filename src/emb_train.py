@@ -130,6 +130,27 @@ def model_forward(model, embeddings, key_padding_mask):
     except TypeError:
         return model(embeddings)
 
+def tune_threshold(probs, targets, num_steps=99):
+    """Sweep classification thresholds on validation probabilities and
+    return the one that maximizes F1 for the positive class."""
+    if len(set(targets)) < 2:
+        # only one class present in val — F1 is degenerate, fall back to 0.5
+        return 0.5, float('nan')
+
+    grid = [(i + 1) / (num_steps + 1) for i in range(num_steps)]  # (0,1) exclusive
+    best_thr = 0.5
+    best_f1 = -1.0
+    for thr in grid:
+        preds = [1 if p >= thr else 0 for p in probs]
+        _, _, f1, _ = precision_recall_fscore_support(
+            targets, preds, labels=[1], average='binary', zero_division=0
+        )
+        f1 = float(f1)
+        # tie-break: prefer threshold closer to 0.5
+        if (f1 > best_f1) or (f1 == best_f1 and abs(thr - 0.5) < abs(best_thr - 0.5)):
+            best_f1 = f1
+            best_thr = thr
+    return best_thr, best_f1
 
 def main():
     # argument parsing
@@ -264,7 +285,8 @@ def main():
     # training loop logging
     history = {'train_loss': [], 'val_loss': [], 
                'train_acc': [], 'val_acc': [],
-               'val_prec': [], 'val_rec': [], 'val_f1': [], 'val_auc': []}
+               'val_prec': [], 'val_rec': [], 'val_f1': [], 'val_auc': [],
+               'val_threshold': [], 'val_f1_at_threshold': []}
     
     # track three independent selection metrics
     # each gets its own checkpoint
@@ -294,6 +316,14 @@ def main():
         # 'epoch' should be 0-indexed start of the next epoch
         start_epoch = ckpt['epoch']
         history = ckpt.get('history', history)
+
+        # backfill new history keys when resuming from an older checkpoint that
+        # predates threshold tuning. Pad with NaN so list lengths stay aligned
+        # with epochs already completed.
+        n_completed = len(history.get('val_loss', []))
+        for k in ('val_threshold', 'val_f1_at_threshold'):
+            if k not in history:
+                history[k] = [float('nan')] * n_completed
 
         # restore all three best-metric trackers; fall back to history if missing
         # (e.g. resuming from an older single-metric checkpoint)
@@ -449,6 +479,11 @@ def main():
                 all_targets, all_preds, labels=[1], average='binary', zero_division=0
             )
 
+            # tune classification threshold on validation probabilities (maximize F1).
+            # this threshold gets baked into the checkpoint and used at test time.
+            # note: val_f1 above is at threshold=0.5 (argmax); val_f1_tuned is at val_threshold.
+            val_threshold, val_f1_tuned = tune_threshold(all_probs, all_targets)
+
             # log timing
             epoch_time = time.time() - epoch_start_time
             epoch_times.append(epoch_time)
@@ -465,6 +500,8 @@ def main():
             history['val_prec'].append(float(val_prec))
             history['val_rec'].append(float(val_rec))
             history['val_f1'].append(float(val_f1))
+            history['val_threshold'].append(float(val_threshold))
+            history['val_f1_at_threshold'].append(float(val_f1_tuned))
 
             # determine which (if any) of the three best metrics improved this epoch
             val_auc_safe = float(val_auc) if not math.isnan(val_auc) else float('-inf')
@@ -492,6 +529,8 @@ def main():
                 'val_loss': avg_val_loss,
                 'val_auc': float(val_auc),
                 'val_f1': float(val_f1),
+                'val_threshold': float(val_threshold),
+                'val_f1_at_threshold': float(val_f1_tuned),
                 'best_val_auc': best_val_auc,
                 'best_val_f1': best_val_f1,
                 'min_val_loss': min_val_loss,
@@ -529,7 +568,8 @@ def main():
                 f"Train Acc: {avg_train_acc*100:.1f}%, "
                 f"Val Acc: {avg_val_acc*100:.1f}%, "
                 f"Val AUC: {val_auc:.3f}, "
-                f"Val P/R/F1: {val_prec:.2f}/{val_rec:.2f}/{val_f1:.2f}"
+                f"Val P/R/F1: {val_prec:.2f}/{val_rec:.2f}/{val_f1:.2f}, "
+                f"Val thr*: {val_threshold:.2f} (F1*={val_f1_tuned:.2f})"
                 f" - Elapsed: {elapsed_str}, Avg/Epoch: {avg_time_str}{tail}"
             )
 
@@ -543,6 +583,8 @@ def main():
                     "val/precision":   float(val_prec),
                     "val/recall":      float(val_rec),
                     "val/f1":          float(val_f1),
+                    "val/threshold":   float(val_threshold),
+                    "val/f1_at_threshold": float(val_f1_tuned),
                     "lr":              scheduler.get_last_lr()[0],
                     "epoch_time_sec":  epoch_time,
                     "best_val_auc":    best_val_auc,

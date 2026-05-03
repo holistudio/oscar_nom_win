@@ -70,10 +70,21 @@ def init_wandb(cfg, results_dir, train_run_id=None):
 def evaluate_checkpoint(model, ckpt_path, test_dataloader, device,
                         use_amp, amp_dtype, batch_size, logger):
     """Load a checkpoint into `model`, run inference on the test set,
-    return a dict of metrics + per-sample results."""
+    return a dict of metrics + per-sample results.
+
+    Uses the validation-tuned classification threshold stored in the checkpoint
+    under 'val_threshold'. If absent (e.g. an older checkpoint), defaults to 0.5
+    which is equivalent to the previous argmax behavior on softmax probs.
+    """
     checkpoint = torch.load(ckpt_path, map_location=device)
     model.load_state_dict(checkpoint['model_state_dict'])
-    logger.info(f"Loaded weights from {ckpt_path.name}")
+
+    threshold = float(checkpoint.get('val_threshold', 0.5))
+    has_threshold = 'val_threshold' in checkpoint
+    logger.info(
+        f"Loaded weights from {ckpt_path.name}  "
+        f"(threshold={threshold:.3f}{'' if has_threshold else ', DEFAULT — no val_threshold in ckpt'})"
+    )
 
     model.eval()
 
@@ -96,8 +107,9 @@ def evaluate_checkpoint(model, ckpt_path, test_dataloader, device,
 
             logits = logits.float()
 
-            predictions = torch.argmax(logits, dim=1)
             probabilities = F.softmax(logits, dim=1)[:, 1]
+            # threshold-based prediction (replaces argmax which was equivalent to thr=0.5)
+            predictions = (probabilities >= threshold).long()
 
             correct += (predictions == targets).sum().item()
             total += targets.size(0)
@@ -140,6 +152,8 @@ def evaluate_checkpoint(model, ckpt_path, test_dataloader, device,
             'auc':       auc,
             'correct':   correct,
             'total':     total,
+            'threshold': threshold,
+            'threshold_source': 'checkpoint' if has_threshold else 'default_0.5',
         },
         'all_targets':       all_targets,
         'all_predictions':   all_predictions,
@@ -250,7 +264,8 @@ def main():
 
         m = out['metrics']
         logger.info(
-            f"  [{variant}] Acc={m['accuracy']*100:.2f}%  "
+            f"  [{variant}] thr={m['threshold']:.3f} ({m['threshold_source']})  "
+            f"Acc={m['accuracy']*100:.2f}%  "
             f"P={m['precision']*100:.2f}%  R={m['recall']*100:.2f}%  "
             f"F1={m['f1']*100:.2f}%  macro-F1={m['macro_f1']*100:.2f}%  "
             f"AUC={m['auc']:.4f}"
@@ -294,6 +309,7 @@ def main():
     logger.info(f"\n{'='*60}")
     logger.info(f"BEST variant: {best_variant}  (composite={best_composite:.4f})")
     logger.info(f"{'='*60}")
+    logger.info(f"  Threshold:  {best_metrics['threshold']:.3f}  ({best_metrics['threshold_source']})")
     logger.info(f"  Accuracy:   {best_metrics['accuracy'] * 100:.2f}%")
     logger.info(f"  Precision:  {best_metrics['precision'] * 100:.2f}%")
     logger.info(f"  Recall:     {best_metrics['recall'] * 100:.2f}%")
@@ -319,6 +335,7 @@ def main():
             wandb.log({
                 "test/best_variant":   best_variant,
                 "test/composite":      best_composite,
+                "test/threshold":      best_metrics['threshold'],
                 "test/accuracy":       best_metrics['accuracy'],
                 "test/precision":      best_metrics['precision'],
                 "test/recall":         best_metrics['recall'],
@@ -334,6 +351,7 @@ def main():
             # W&B leaderboard summary metrics
             wandb.run.summary["test/best_variant"] = best_variant
             wandb.run.summary["test/composite"]    = best_composite
+            wandb.run.summary["test/threshold"]    = best_metrics['threshold']
             wandb.run.summary["test/accuracy"]     = best_metrics['accuracy']
             wandb.run.summary["test/precision"]    = best_metrics['precision']
             wandb.run.summary["test/recall"]       = best_metrics['recall']
@@ -378,10 +396,11 @@ def main():
 
             # small comparison table across all evaluated variants
             variant_table = wandb.Table(
-                columns=["variant", "composite", "accuracy", "auc", "f1",
+                columns=["variant", "threshold", "composite", "accuracy", "auc", "f1",
                          "macro_f1", "precision", "recall", "is_best"],
                 data=[[
                     v,
+                    eval_outputs[v]['metrics']['threshold'],
                     composite_scores[v],
                     eval_outputs[v]['metrics']['accuracy'],
                     eval_outputs[v]['metrics']['auc'],
