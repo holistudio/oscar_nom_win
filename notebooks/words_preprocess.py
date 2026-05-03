@@ -41,10 +41,46 @@ ALLOWLIST = {
     "won't", "can't", "shouldn't", "wouldn't", "couldn't", "mustn't",
     # Emotionally loaded function words
     'never', 'always', 'every', 'nothing', 'everything', 'nobody', 'no',
-    'not', "n't",
+    'not', #"n't",
 }
 
-STOPWORDS = base_stopwords - ALLOWLIST
+# --- Screenplay-specific stopwords ---
+# Words that dominate every screenplay regardless of quality or genre.
+# Grouped by category for maintainability.
+SCREENPLAY_STOPWORDS = {
+    # Format / scene heading artifacts
+    'int', 'ext', 'cont', 'contd', 'vo', 'os', 'oc', 'pod', 'cu', 'pov',
+    'establishing', 'intercut', 'smash', 'fade', 'cut', 'dissolve', 'montage',
+    'title', 'card', 'subtitle', 'superimpose', 'super',
+
+    # Generic high-frequency action verbs (appear in virtually every script)
+    'look', 'see', 'come', 'go', 'take', 'walk', 'turn', 'move',
+    'stand', 'sit', 'open', 'close', 'pull', 'push', 'reach', 'grab',
+    'hold', 'put', 'step', 'stop', 'start', 'run', 'hear', 'watch',
+    'say', 'tell', 'think', 'know', 'want', 'need', 'try', 'get',
+    'give', 'make', 'find', 'keep', 'let', 'enter', 'exit',
+    'cross', 'head', 'hand', 'pass', 'beat', 'stare',
+
+    # Generic spatial / positional words
+    'back', 'away', 'around', 'toward', 'inside', 'outside', 'front',
+    'behind', 'across', 'over', 'down', 'near', 'side',
+
+    # Generic character placeholders and titles
+    'man', 'woman', 'girl', 'boy', 'guy', 'kid', 'mr', 'mrs', 'ms', 'dr',
+    'one', 'two', 'three', 'young', 'old', 'new',
+
+    # Filler / acknowledgment words
+    'yeah', 'okay', 'ok', 'oh', 'hey', 'uh', 'um', 'ah', 'well',
+    'right', 'sure', 'got', 'just', 'like', 'really', 'good',
+    'still', 'even', 'also',
+
+    # Common generic nouns with no discriminative signal
+    'room', 'door', 'house', 'time', 'day', 'night', 'moment', 'place',
+    'window', 'table', 'floor', 'wall', 'street', 'car', 'phone',
+    'face', 'eye', 'voice', 'thing', 'something', 'anything', 'way',
+}
+
+STOPWORDS = (base_stopwords - ALLOWLIST) | SCREENPLAY_STOPWORDS
 
 # --- Lemmatizer ---
 lemmatizer = WordNetLemmatizer()
@@ -55,7 +91,7 @@ def preprocess_script(text: str) -> list[str]:
     Takes a script_clean string and returns a list of lemmatized tokens.
     - Lowercases
     - Strips punctuation (keeps apostrophes for contractions)
-    - Removes stopwords (minus allowlist)
+    - Removes stopwords (minus allowlist) + screenplay-specific stopwords
     - Lemmatizes
     """
     # Lowercase
@@ -63,6 +99,10 @@ def preprocess_script(text: str) -> list[str]:
 
     # Normalize contractions apostrophe style (curly -> straight)
     text = text.replace('\u2019', "'").replace('\u2018', "'")
+
+    # Strip contractions: "don't" → "dont", "can't" → "cant", etc.
+    text = re.sub(r"'", "", text)
+    
 
     # Keep only alphabetic characters and apostrophes (for contractions)
     # Then split on whitespace
