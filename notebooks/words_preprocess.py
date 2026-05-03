@@ -1,6 +1,8 @@
 import os
 import re
 import time
+import pickle
+import datetime
 import pandas as pd
 import nltk
 from nltk.corpus import stopwords
@@ -13,7 +15,18 @@ nltk.download('omw-1.4', quiet=True)
 
 # --- Config ---
 processed_dir = os.path.join('..', 'data', 'processed')
+
 df_train = pd.read_parquet(os.path.join(processed_dir, 'train_clean.parquet'))
+df_val   = pd.read_parquet(os.path.join(processed_dir, 'val_clean.parquet'))
+df_test  = pd.read_parquet(os.path.join(processed_dir, 'test_clean.parquet'))
+
+SPLITS = [
+    ('train', df_train),
+    ('val',   df_val),
+    ('test',  df_test),
+]
+
+N_TOTAL_GLOBAL = sum(len(df) for _, df in SPLITS)
 
 # --- Stopword list ---
 # Start with NLTK base, then punch holes for meaningful words
@@ -66,44 +79,58 @@ def preprocess_script(text: str) -> list[str]:
 
 
 # --- Main loop ---
-results = []  # will hold dicts of {imdb_id, nominated, winner, tokens}
-elapsed_times = []
+elapsed_times = []   # tracks time across ALL splits for global ETA
+n_processed_global = 0
 
-print("\nStarting train dataset word pre-processing...")
+print(f"\nStarting word pre-processing across all splits ({N_TOTAL_GLOBAL} total scripts)...")
 
-for idx, row in df_train.iterrows():
-    t_start = time.perf_counter()
+for split_name, df in SPLITS:
+    print(f"\n{'='*60}")
+    print(f"  Split: {split_name.upper()}  ({len(df)} scripts)")
+    print(f"{'='*60}")
 
-    script_text = row['script_clean']
-    tokens = preprocess_script(script_text)
+    results = []
 
-    t_elapsed = time.perf_counter() - t_start
-    elapsed_times.append(t_elapsed)
+    for idx, row in df.iterrows():
+        t_start = time.perf_counter()
 
-    results.append({
-        'imdb_id':    row['imdb_id'],
-        'movie_name': row['movie_name'],
-        'nominated':  row['nominated'],
-        'winner':     row['winner'],
-        'tokens':     tokens,
-        'token_count': len(tokens),
-    })
+        script_text = row['script_clean']
+        tokens = preprocess_script(script_text)
 
-    avg_t = sum(elapsed_times) / len(elapsed_times)
-    n_processed = len(elapsed_times)
-    n_total = len(df_train)
-    eta_seconds = avg_t * (n_total - n_processed)
+        t_elapsed = time.perf_counter() - t_start
+        elapsed_times.append(t_elapsed)
+        n_processed_global += 1
 
-    print(f"[{idx}] {row['movie_name']}")
-    print(f"  nominated={row['nominated']}  winner={row['winner']}")
-    print(f"  token_count={len(tokens)}")
-    print(f"  first 10 tokens: {tokens[:10]}")
-    print(f"  time this script : {t_elapsed:.2f}s")
-    print(f"  avg time/script  : {avg_t:.2f}s  ({n_processed}/{n_total} processed)")
-    print(f"  ETA full dataset : {eta_seconds/60:.1f} min at this rate")
-    print()
+        results.append({
+            'imdb_id':     row['imdb_id'],
+            'movie_name':  row['movie_name'],
+            'nominated':   row['nominated'],
+            'winner':      row['winner'],
+            'tokens':      tokens,
+            'token_count': len(tokens),
+        })
 
-    # Break after first sample for runtime assessment
-    break
+        avg_t = sum(elapsed_times) / len(elapsed_times)
+        n_remaining = N_TOTAL_GLOBAL - n_processed_global
+        eta_seconds = avg_t * n_remaining
+        eta_timestamp = datetime.datetime.now() + datetime.timedelta(seconds=eta_seconds)
 
-print("Done. Extend the loop by removing the break.")
+        print(f"[{split_name}:{idx}] {row['movie_name']}")
+        print(f"  nominated={row['nominated']}  winner={row['winner']}")
+        print(f"  token_count={len(tokens)}")
+        print(f"  first 10 tokens: {tokens[:10]}")
+        print(f"  time this script : {t_elapsed:.2f}s")
+        print(f"  avg time/script  : {avg_t:.2f}s  ({n_processed_global}/{N_TOTAL_GLOBAL} processed globally)")
+        print(f"  ETA full dataset : {eta_seconds/60:.1f} min  (done ~{eta_timestamp.strftime('%H:%M:%S')})")
+        print()
+
+    # --- Save split results ---
+    df_results = pd.DataFrame(results)
+
+    out_path = os.path.join(processed_dir, f'words_{split_name}.pkl')
+    with open(out_path, 'wb') as f:
+        pickle.dump(df_results, f)
+
+    print(f"  Saved {len(df_results)} records → {out_path}")
+
+print("\nDone. All splits processed and saved.")
