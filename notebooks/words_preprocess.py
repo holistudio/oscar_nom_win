@@ -6,12 +6,15 @@ import datetime
 import pandas as pd
 import nltk
 from nltk.corpus import stopwords
+from nltk.corpus import words as nltk_words
 from nltk.stem import WordNetLemmatizer
+from wordfreq import word_frequency
 
 # --- One-time NLTK downloads ---
 nltk.download('stopwords', quiet=True)
 nltk.download('wordnet', quiet=True)
 nltk.download('omw-1.4', quiet=True)
+nltk.download('words', quiet=True)
 
 # --- Config ---
 processed_dir = os.path.join('..', 'data', 'processed')
@@ -34,8 +37,8 @@ base_stopwords = set(stopwords.words('english'))
 
 ALLOWLIST = {
     # Gender pronouns
-    'he', 'she', 'they', 'him', 'her', 'his', 'hers', 'their', 'theirs',
-    'himself', 'herself', 'themselves',
+    # 'he', 'she', 'they', 'him', 'her', 'his', 'hers', 'their', 'theirs',
+    # 'himself', 'herself', 'themselves',
     # Modal verbs
     'must', 'should', 'would', 'could', 'might', 'may', 'will', 'shall',
     "won't", "can't", "shouldn't", "wouldn't", "couldn't", "mustn't",
@@ -49,9 +52,9 @@ ALLOWLIST = {
 # Grouped by category for maintainability.
 SCREENPLAY_STOPWORDS = {
     # Format / scene heading artifacts
-    'int', 'ext', 'cont', 'contd', 'vo', 'os', 'oc', 'pod', 'cu', 'pov',
+    'int', 'ext', 'cont', 'contd', 'vo', 'os', 'oc', 'pod', 'cu', 'pov', 'bos',
     'establishing', 'intercut', 'smash', 'fade', 'cut', 'dissolve', 'montage',
-    'title', 'card', 'subtitle', 'superimpose', 'super',
+    'title', 'card', 'subtitle', 'superimpose', 'super', 'camera', 'angle', 'shot',
 
     # Generic high-frequency action verbs (appear in virtually every script)
     'look', 'see', 'come', 'go', 'take', 'walk', 'turn', 'move',
@@ -72,7 +75,7 @@ SCREENPLAY_STOPWORDS = {
     # Filler / acknowledgment words
     'yeah', 'okay', 'ok', 'oh', 'hey', 'uh', 'um', 'ah', 'well',
     'right', 'sure', 'got', 'just', 'like', 'really', 'good',
-    'still', 'even', 'also',
+    'still', 'even', 'also', 
 
     # Common generic nouns with no discriminative signal
     'room', 'door', 'house', 'time', 'day', 'night', 'moment', 'place',
@@ -80,9 +83,14 @@ SCREENPLAY_STOPWORDS = {
     'face', 'eye', 'voice', 'thing', 'something', 'anything', 'way',
 }
 
-STOPWORDS = (base_stopwords - ALLOWLIST) | SCREENPLAY_STOPWORDS
+custom_stopwords = {'yes', 'as', 'jack', 'mark', 'bill', 'joe', 'sam', 
+                    'mary', 'er', 'view', 'th', 'per', 'pause', 'en', 'al',
+                    'ho', 'ya', 'e'}
+
+STOPWORDS = (base_stopwords - ALLOWLIST) | SCREENPLAY_STOPWORDS | custom_stopwords
 
 # --- Lemmatizer ---
+ENGLISH_WORDS = set(nltk_words.words())
 lemmatizer = WordNetLemmatizer()
 
 
@@ -112,7 +120,10 @@ def preprocess_script(text: str) -> list[str]:
     tokens = [
         lemmatizer.lemmatize(tok)
         for tok in tokens
-        if tok not in STOPWORDS and len(tok) > 1
+        if tok not in STOPWORDS
+        and len(tok) > 1
+        and tok in ENGLISH_WORDS
+        and word_frequency(tok, 'en') >= 1e-6
     ]
 
     return tokens
