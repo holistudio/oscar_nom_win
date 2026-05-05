@@ -1,5 +1,86 @@
 # Development Log
 
+## 2026-05-05
+
+Documenting how things work now that I've reached a major milestone in this project, but might come back to this later with more better neural net architectures and training methods.
+
+First the `src` folder:
+
+After data is cleaned and processed in `data` folder outside of `src` it is processed further as either token IDs (`token_data/` folder) or GPT-2 (124M) embeddings, dim=768 (`gpt2_embed/` folder)
+
+```
+root/
+├── src/
+│   ├── token_data/
+│   ├── gpt2_embed/
+|   |   └─ 124M/
+│   ├── gpt2_embed/
+│   ├─ token_dataset.py
+│   ├─ gpt_download.py
+│   ├─ emb_gpt.py
+│   ├─ emb_generate.py
+...
+```
+
+`token_dataset.py` transforms processed dataset into token IDs, saving in the `token_data` folder. Then the `emb_generate.py` script uses the GPT-2 model (`emb_gpt.py`) with pre-trained weights (`gpt2/` folder) to generate the embeddings for each screenplay, saving to `gpt2_embed/` folder
+
+Two sets of files exist in `src`, one set for training/testing on token IDs, another set for GPT-2 embeddings.
+
+For token ID data, the relevant files are:
+
+```
+root/
+├── src/
+│   ├── token_data/
+│   ├── standalone/
+│   ├─ datasets.py
+│   ├─ token_dataset.py
+│   ├─ causal_transformer.py
+│   ├─ mean_transformer.py
+│   ├─ config_causal.json
+│   ├─ config_mean.json
+│   ├─ train.py
+│   ├─ test.py
+│   ├─ train_test.sh
+...
+```
+
+`train.py` and `test.py` report to Weights and Biases project if ` "wandb": {"enabled": true}` is defined in the config. Versions of these files that don't use weights and biases at all are in the `standalone/` folder (but you could just set `"enabled": false`...)
+
+For GPT2 embeddings the relevant files are:
+```
+root/
+├── src/
+│   ├── gpt2_embed/
+│   ├─ datasets.py
+│   ├─ mean_agg.py
+│   ├─ emb_config.json
+│   ├─ emb_train.py
+│   ├─ emb_test.py
+│   └─ emb_train_test.sh
+...
+```
+
+`emb_train.py` and `emb_test.py` start with the embedding dataset in `gpt2_embed/` folder and trains/tests the `mean_agg.py` transformer model (basically the aggregator half of the `mean_transformer` model).
+
+This equates to the following pipeline:
+
+<img src="./docs/260505_pipeline.png">
+
+### Future Work
+
+- other neural nets (BERT, Longformer, Mamba)
+- other tokenizations besides GPT-2's encoding
+- address class imbalance beyond cross entropy loss class weights and threshold tuning
+- look into causes for threshold tuning according F-1 score and how that may result in very low decision thresholds (1-4%)
+- refer to research document [here](./docs/research/class_imbalance_v0.md)
+- focus on labeling based on whether the screenplay itself got an Oscar nomination, rather than Oscar nomination or win for some other category.
+- hyperparameter tuning with Raytune and Weights and Biases
+
+## 2026-05-03
+
+Ran a lot of sweeps looking at different model and training hyperparemtners (in the `docs/design/` folder).
+
 ## 2026-04-29
 
 **TODOS:**
@@ -8,15 +89,15 @@
 - [x] Modify `train.py` to also use AUC/F-1 as basis for selecting best model
 - [x] Use mixed precision (`train.py`)
 
-- [ ] Set up W&B
-- [ ] Start with 5 epoch learning rate schedule
-- [ ] Run smaller config training
-- [ ] Run GPU temperature logging in separate terminal
-- [ ] See results on W&B
-- [ ] Run original large config training
-- [ ] Run GPU temperature logging in separate terminal
-- [ ] See results on W&B
-- [ ] ...
+- [x] Set up W&B
+- [x] Start with 5 epoch learning rate schedule
+- [x] Run smaller config training
+- [x] Run GPU temperature logging in separate terminal
+- [x] See results on W&B
+- [x] Run original large config training
+- [x] Run GPU temperature logging in separate terminal
+- [x] See results on W&B
+
 
 
 ## 2026-04-28
@@ -26,9 +107,9 @@ Circling back to this...
 Couple thing I'm most interested in doing:
 - ~~Revisit chunky transformer model~~
 - ~~Figure out how `train.py` can take any arbitrary model architecture and train it~~
-- See what it would take to train models on W&B + RunPod
-- Look at distributions of words in the dataset: are there words that show up more frequently in Oscar nominated films or not?
-- A similar question can be asked for the model predictions (i.e. "the model seems to think that words X, Y, Z increase probability...")
+- ~~See what it would take to train models on W&B~~ + RunPod
+- ~~Look at distributions of words in the dataset: are there words that show up more frequently in Oscar nominated films or not?~~
+- ~~A similar question can be asked for the model predictions~~ (i.e. "the model seems to think that words X, Y, Z increase probability...")
 
 ### Chunky Transformer Revisit
 
@@ -105,6 +186,14 @@ A single sample takes about a 2 min (batch_size=2 runs out of CUDA memory):
 For a very controlled experiment this should carry back over to the training for the chunky transformer.
 
 Until I can see if using cloud GPU resources might make things faster, hyperparameter tuning via Raytune also feels like overkill for now.
+
+### Post Script
+
+Not sure **loading** the GPT-2 model weights is the way to go. Keyword is loading the weights onto a GPU. That means running all those computations for every screenplay sample every epoch, which takes a looong time.
+
+I tried "random sub-sampling" to try to speed things up...but that means the models see even less data and the resulting performance is terrible.
+
+Loading GPT-2 weights makes sense if you want to fine-tune some (or all) GPT-2 weights for a specific problem. But if you are going to keep all GPT-2 weights completely frozen during training, you might as well use GPT-2 to generate the embeddings for each screenplay before training, and then feed those embeddings as the "training samples" for any model architecture. See 2026-04-28 devlog entry.
 
 ## 2026-03-06
 
@@ -203,12 +292,12 @@ For today I'm just going to make sure the "basic puzzle pieces" are all here:
 
 ### TODOs for later
 
-- [ ] Get Chunky versions of transformer and GPT-2 to work. 
-- [ ] Make sure these are done in separate branches
+- [x] Get Chunky versions of transformer and GPT-2 to work. 
+- [x] Make sure these are done in separate branches
 - [x] Write a simple "unit test" script: load a random movie script in the training set and give it to a model. It should at least spit out a probability with no issues.
-- [ ] Exploratory data analysis of word frequencies in movie screenplays.
-- [ ] Consider ways to deal with the class imbalance during training.
-- [ ] Training-validation-test loops
+- [x] Exploratory data analysis of word frequencies in movie screenplays.
+- [x] Consider ways to deal with the class imbalance during training.
+- [x] Training-validation-test loops
 - [ ] Use Raytune for tuning hyperparameters.
 
 ## 2026-01-14
@@ -249,7 +338,7 @@ The other "pie-in-the-sky" goals are beyond my current coding/ML knowledge since
 ### TODOs for later
 
 - [x] Re-organize notebook files and datasets 
-- [ ] Exploratory data analysis of word frequencies in movie screenplays.
+- [x] Exploratory data analysis of word frequencies in movie screenplays.
 
 ### Regarding AI-assisted workflows
 
