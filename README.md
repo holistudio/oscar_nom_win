@@ -11,7 +11,7 @@ Specifically, I was interested in two approaches and one key constraint:
 - Training another transformer model that uses GPT-2 pre-trained weights somehow, and see how the performance
 - Do it all on a laptop RTX 4090 GPU (16GB vRAM)
 
-I wasn't yet interested in chasing state of the art architectures and methods, I just wanted to understand the limits of basic architectures.
+I wasn't yet interested in chasing state of the art architectures and methods, I just wanted to understand the limits of these conventional architectures.
 
 ## Dataset
 
@@ -75,7 +75,7 @@ Overall, the performance is close but not quite better than baseline in the key 
 
 Parameters for reference:
 
-| Name | enc_d | enc_h | enc_L | agg_d | agg_h | agg_L |
+| Name | enc_dim | enc_nhead | enc_layers | agg_dim | agg_nhead | agg_layers |
 |---|---|---|---|---|---|---|
 | causal_transformer | 128 | 8 | 2 | 128 | 8 | 2 |
 | mean_transformer | 96 | 8 | 2 | 96 | 4 | 2 |
@@ -98,3 +98,11 @@ First row shows a pair of word clouds for words that show up more often in test 
 On the face of these results, it seems that the mean-pool transformer is correctly picking up a signal from the word "dog" to predict a screenplay will be Oscar nominated. The GPT-2 embedding model is correctly picking up on the words "van" and "bell" to predict a screenplay will not be Oscar nominated. More analysis results can be found in this [notebook](./notebooks/04_prediction_word_exploration.ipynb).
 
 While this does not offer a comprehensive understanding of what signals are guiding the model to make predictions, it does provide some keywords to look out for in future interpretability work.
+
+## Future Work
+
+- other neural nets (BERT, Longformer, Mamba)
+- other tokenizations besides GPT-2's encoding
+- address class imbalance beyond cross entropy loss class weights and threshold tuning
+- focus on labeling based on whether the screenplay itself got an Oscar nomination, rather than Oscar nomination or win for some other category.
+- investigate mechanistic interpretabilty and other methods to understand why a model is making a prediction
