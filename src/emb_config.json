@@ -1,0 +1,61 @@
+{
+  "model": {
+    "module": "mean_agg",
+    "class_name": "OscarNomAgg",
+    "params": {
+      "chunk_size": 1024,
+      "enc_d_model": 768,
+      "agg_d_model": 256,
+      "agg_nhead": 8,
+      "agg_num_layers": 4,
+      "max_seq_len": 106578,
+      "dropout": 0.25
+    }
+  },
+  "training": {
+    "epochs": 40,
+    "batch_size": 8,
+    "peak_lr": 0.0003,
+    "weight_decay": 0.1,
+    "eta_min": 1e-06,
+    "warmup_fraction": 0.05,
+    "grad_clip": 1.0,
+    "class_weights": [
+      1.0,
+      8.0
+    ],
+    "label_smoothing": 0.1,
+    "seed": 1337,
+    "checkpoint_prefix": "best_gpt_agg",
+    "models_dir": "../models",
+    "results_dir": "../results",
+    "sub_dir": "best_results",
+    "history_filename": "training_history.json"
+  },
+  "data": {
+    "embed_dir": "./gpt2_embed",
+    "eager_load": true,
+    "subsample": null
+  },
+  "wandb": {
+    "enabled": true,
+    "project": "oscar_nom_win",
+    "entity": null,
+    "mode": "offline",
+    "name": null,
+    "tags": [
+      "gpt2_emb_frozen",
+      "causal_enc",
+      "bidir_agg",
+      "enc_d_768",
+      "enc_nhead_12",
+      "enc_l_12",
+      "agg_d_256",
+      "agg_nhead_8",
+      "agg_l_4"
+    ],
+    "notes": "use gpt-2 based screenplay embeddings",
+    "watch_model": false,
+    "watch_log_freq": 100
+  }
+}

@@ -1,0 +1,64 @@
+{
+  "model": {
+    "module": "causal_transformer",
+    "class_name": "OscarNomTransformer",
+    "params": {
+      "chunk_size": 1024,
+      "vocab_size": 50257,
+      "enc_d_model": 128,
+      "enc_nhead": 8,
+      "enc_num_layers": 2,
+      "agg_d_model": 128,
+      "agg_nhead": 8,
+      "agg_num_layers": 2,
+      "max_seq_len": 106578,
+      "dropout": 0.4
+    }
+  },
+  "training": {
+    "epochs": 15,
+    "batch_size": 4,
+    "peak_lr": 0.0001,
+    "weight_decay": 0.1,
+    "eta_min": 1e-06,
+    "warmup_fraction": 0.1,
+    "grad_clip": 1.0,
+    "class_weights": [
+      1.0,
+      8.0
+    ],
+    "label_smoothing": 0.0,
+    "seed": 1337,
+    "checkpoint_prefix": "best_causal_trf",
+    "models_dir": "../models",
+    "results_dir": "../results",
+    "sub_dir": "best_results",
+    "history_filename": "training_history.json"
+  },
+  "data": {
+    "train_path": "./token_data/train_tokenized.pkl",
+    "val_path": "./token_data/val_tokenized.pkl",
+    "test_path": "./token_data/test_tokenized.pkl",
+    "subsample": null
+  },
+  "wandb": {
+    "enabled": true,
+    "project": "oscar_nom_win",
+    "entity": null,
+    "mode": "offline",
+    "name": null,
+    "tags": [
+      "causal_enc",
+      "causal_agg",
+      "enc_d_128",
+      "enc_nhead_8",
+      "enc_l_2",
+      "agg_d_128",
+      "agg_nhead_8",
+      "agg_l_2"
+    ],
+    "notes": "AUC version: more heads",
+    "watch_model": false,
+    "watch_log_freq": 100
+  }
+}
