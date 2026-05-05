@@ -52,7 +52,7 @@ ALLOWLIST = {
 # Grouped by category for maintainability.
 SCREENPLAY_STOPWORDS = {
     # Format / scene heading artifacts
-    'int', 'ext', 'cont', 'contd', 'vo', 'os', 'oc', 'pod', 'cu', 'pov', 'bos',
+    'int', 'ext', 'cont', 'contd', 'vo', 'os', 'oc', 'pod', 'cu', 'pov',
     'establishing', 'intercut', 'smash', 'fade', 'cut', 'dissolve', 'montage',
     'title', 'card', 'subtitle', 'superimpose', 'super', 'camera', 'angle', 'shot',
 
@@ -83,9 +83,9 @@ SCREENPLAY_STOPWORDS = {
     'face', 'eye', 'voice', 'thing', 'something', 'anything', 'way',
 }
 
-custom_stopwords = {'yes', 'as', 'jack', 'mark', 'bill', 'joe', 'sam', 
+custom_stopwords = {'yes', 'as', 'jack', 'mark', 'bill', 'joe', 'sam', 'henry',
                     'mary', 'er', 'view', 'th', 'per', 'pause', 'en', 'al',
-                    'ho', 'ya', 'e'}
+                    'ho', 'ya', 'lo', 'e', 'bos'}
 
 STOPWORDS = (base_stopwords - ALLOWLIST) | SCREENPLAY_STOPWORDS | custom_stopwords
 
@@ -118,12 +118,13 @@ def preprocess_script(text: str) -> list[str]:
 
     # Remove stopwords and lemmatize
     tokens = [
-        lemmatizer.lemmatize(tok)
+        lemma
         for tok in tokens
-        if tok not in STOPWORDS
-        and len(tok) > 1
+        if len(tok) > 1
         and tok in ENGLISH_WORDS
         and word_frequency(tok, 'en') >= 1e-6
+        for lemma in [lemmatizer.lemmatize(tok)]
+        if lemma not in STOPWORDS
     ]
 
     return tokens
