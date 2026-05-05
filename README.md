@@ -4,7 +4,7 @@ This project is an attempt to predict whether a movie gets an Oscar nomination o
 
 ## Background
 
-During my recent batch at [The Recurse Center](recurse.com), a study group around Sebastian Raschka's *Building LLMs from Scratch* book got interested in other datasets, particularly inspired by the Classification Fine-tuning chapter of the book where a GPT-2 pretrained model is finetuned to classify spam messages. I came across this [dataset](https://huggingface.co/datasets/Francis2003/Movie-O-Label) on HuggingFace and tried (and failed) to beat the baseline model classification metrics shown with the dataset.
+During my recent batch at [The Recurse Center](https://www.recurse.com/), a study group around Sebastian Raschka's *Building LLMs from Scratch* book got interested in other datasets, particularly inspired by the Classification Fine-tuning chapter of the book where a GPT-2 pretrained model is finetuned to classify spam messages. I came across this [dataset](https://huggingface.co/datasets/Francis2003/Movie-O-Label) on HuggingFace and tried (and failed) to beat the baseline model classification metrics shown with the dataset.
 
 Specifically, I was interested in two approaches and one key constraint:
 - Training a basic transformer model from scratch.
@@ -54,7 +54,7 @@ I eventually settled on the same basic architecture but with key variations:
 Three specific variations were explored:
 - `causal_transformer` applies a causal mask in all Transformer Blocks (encoder and aggregator) and then isolates the last vector (i.e., `get_single_vector` is just slicing the last position of the transformer block output `out[:, -1, :]`). This is consistent with how GPT-2 works.
 - `mean_transformer` instead doesn't use a causal mask but instead performs mean-pooling on the transformer blcok outputs (i.e., `get_single_vector` is `out.mean(dim=1)`)
-- `emb_gpt + mean_agg` uses GPT-2 (124M) to act as encoder and generate the embedding vectors. Then a mean-pool transformer module aggregates and predicts like in `mean_transformer`
+- `gpt2_emb_agg` uses GPT-2 (124M) to act as encoder and generate the embedding vectors. Then a mean-pool transformer module aggregates and predicts like in `mean_transformer`
 
 The first two variations were trained where all parameters were trainable. The third variation used generated GPT-2 embeddings throughout training, essentially testing an full architecture were the only the aggregator is trainable and the GPT-2 model weights are frozen.
 
