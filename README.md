@@ -46,7 +46,7 @@ I eventually settled on the same basic architecture but with key variations:
 <img src="./docs/design/260505_same_idea.png">
 
 **Basic approach**
-1. Breakdown each long screenplay into chunks.
+1. Breakdown each long screenplay into chunks (`1024` tokens, GPT-2 encoding).
 2. "Encode" each chunk into an embedding vector. While a Transformer Block outputs a 2D matrix for each screenplay chunk, the 2D matrix is then transformed into a single embedding vector (`get_single_vector`) based on a choice of operations (mean-pooling, last slice, etc, see below)
 3. Each screenplay basically gets "compressed" into a stack/sequence of embedding vectors.
 4. "Aggregate" the stack of embedding vectors with another transformer module to predict logits for nominated/not nominated for an Oscar.
