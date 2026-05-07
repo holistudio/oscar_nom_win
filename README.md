@@ -8,8 +8,8 @@ During my recent batch at [The Recurse Center](https://www.recurse.com/), a stud
 
 Specifically, I was interested in two approaches and one key constraint:
 - Training a basic transformer model from scratch.
-- Training another transformer model that uses GPT-2 pre-trained weights somehow, and see how the performance
-- Do it all on a laptop RTX 4090 GPU (16GB vRAM)
+- Training another transformer model that uses GPT-2 pre-trained weights somehow, and see how the performance changes.
+- Do it all on a laptop RTX 4090 GPU (16GB vRAM).
 
 I wasn't yet interested in chasing state of the art architectures and methods, I just wanted to understand the limits of these conventional architectures.
 
