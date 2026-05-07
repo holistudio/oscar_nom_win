@@ -53,7 +53,7 @@ I eventually settled on the same basic architecture but with key variations:
 
 Three specific variations were explored:
 - `causal_transformer` applies a causal mask in all Transformer Blocks (encoder and aggregator) and then isolates the last vector (i.e., `get_single_vector` is just slicing the last position of the transformer block output `out[:, -1, :]`). This is consistent with how GPT-2 works.
-- `mean_transformer` instead doesn't use a causal mask but instead performs mean-pooling on the transformer blcok outputs (i.e., `get_single_vector` is `out.mean(dim=1)`)
+- `mean_transformer` doesn't use a causal mask but instead performs mean-pooling on the transformer block output (i.e., `get_single_vector` is `out.mean(dim=1)`)
 - `gpt2_emb_agg` uses GPT-2 (124M) to act as encoder and generate the embedding vectors. Then a mean-pool transformer module aggregates and predicts like in `mean_transformer`
 
 The first two variations were trained where all parameters were trainable. The third variation used generated GPT-2 embeddings throughout training, essentially testing an full architecture were the only the aggregator is trainable and the GPT-2 model weights are frozen.
